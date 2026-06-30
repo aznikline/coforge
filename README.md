@@ -1,111 +1,126 @@
-# coforge — PoC
+# coforge
 
-> **coforge** = co(协作) + forge(锻造)。人机共锻。
->
-> Raft 平替的最小 PoC。单人 + 多 agent,验证 C1(频道内 @mention 路由)+ C2(持久记忆)。自研 coforge-router 做路由 + 本地 SQLite 记忆 + 百炼 GLM-5.1 做 LLM,自造最小 React 前端。**零外部 agent 服务依赖**——记忆完全本地化。
->
-> 完整分析与设计见 [docs/](docs/)。
+> **A multi-agent chat workspace where agents keep their memory between sessions.**
 
-## 架构
+`coforge` is a small, self-contained workspace where you talk to several named
+agents in one channel, and each agent remembers what you told it — across
+browser refreshes, across router restarts. The memory lives in a local SQLite
+file you can open, read, and delete.
 
-```
-浏览器 (最小 React, Vite)
-    ↓ POST /api/chat
-coforge-router (Node + Fastify)
-    - @mention 解析 → agent
-    - 串行队列（绕开 C3）
-    - SQLite: 频道历史 + agent 记忆
-    ↓ OpenAI 兼容 HTTP
-百炼 GLM-5.1 (dashscope)
-```
+It is **not** a production collaboration platform. It is a compact, readable
+reference for how persistent identity, per-agent memory, and in-channel routing
+fit together — small enough to read end to end in an afternoon.
 
-每个 agent = {persona + 持久记忆}。记忆存 SQLite,每次对话把历史拼进 prompt,所以**关掉 router 重起,agent 仍记得**。
+## What this is (honest)
 
-## 起来
+- A single channel with `@mention` routing — `@Noel`, `@Pat`, `@Sam` each route
+  to a distinct agent with its own persona and its own memory.
+- Persistent per-agent memory in SQLite (`coforge.db`): every turn is stored,
+  and the agent's full history is replayed into the prompt on the next message.
+  Kill the router, restart it, ask "what's my name?" — the agent still knows.
+- Memory is **isolated per agent** by design: tell something to `@Noel` and
+  `@Pat` does not learn it. Each agent is its own context.
+- LLM-agnostic: anything that speaks the OpenAI chat-completions schema works
+  (OpenAI, OpenRouter, local Ollama / LM Studio, …). Bring your own key.
+- A minimal React frontend, a Fastify router, and `node:sqlite` — no external
+  agent framework, no vector database, no daemon beyond the router process.
 
-### 1. 配 .env
+## What this is not
 
-```bash
-cp .env.example .env
-# 编辑 .env 填入 LLM_API_KEY（百炼 key）
-```
+- **No real multi-agent coordination.** Messages in a channel are processed
+  serially through one queue. Two agents cannot act at the same time on the
+  same state. This is the single biggest gap versus any "real" agent team
+  product, and it is sidestepped here on purpose.
+- **No collaboration, only routing.** You `@` an agent and it answers. Agents
+  do not talk to each other, claim work, or notice what teammates did.
+- **Single user.** No auth, no multi-tenant, no shared channels between humans.
+- **No memory compression.** The whole history goes back into the prompt every
+  turn. Fine for a session; it will cost tokens and eventually context as a
+  conversation grows. There is no summarization or archival layer.
+- **No self-hosted execution surface.** The router runs locally as a process;
+  there is no daemon that runs agents on your hardware the way a full
+  deployment would.
+- **No enterprise layer.** No SSO, RBAC, audit log, or access control.
 
-百炼 key 去 https://bailian.console.aliyun.com/ 拿。
+These are not TODOs dressed as limitations. Several are deliberate non-goals
+that keep the code readable. If you need any of them, `coforge` is the wrong
+starting point — treat it as a map, not a foundation.
 
-### 2. 装 router 依赖
-
-```bash
-cd router
-npm install
-```
-
-### 3. 起 router
-
-```bash
-cd router
-npm run dev
-# coforge-router ready on :8787
-```
-
-agents 配置在项目根的 `agents.json`(Noel=前端 / Pat=后端 / Sam=文档),改 persona 直接编辑重启即可。
-
-### 4. 起前端
-
-另开一个终端:
-
-```bash
-cd web
-npm install
-npm run dev
-# 打开 http://localhost:5173
-```
-
-## 验证(C2 持久记忆是核心)
-
-在浏览器 http://localhost:5173:
-
-1. `@Noel 我是 wizout,在做 coforge 项目`
-2. **关掉浏览器,重开** http://localhost:5173
-3. `@Noel 我叫什么?` → 应答 "wizout"(**持久记忆跨会话**,记忆在 SQLite 不在内存)
-4. `@Pat 帮我看个后端问题` → Pat 后端 persona 响应(**多 agent 路由**)
-5. `@Sam 写个 README` → Sam 文档 persona 响应
-
-也可关掉 router 重起,Noel 仍记得(记忆在 coforge.db)。
-
-## 已知限制(PoC 诚实标注)
-
-- **无 C3 协调**:同一频道同时多条消息排队串行处理,不是真并发。多个 agent 不能同时响应。
-- **伪协作**:靠人 @ 切换 agent,不是 agent 间自主协作。
-- **单人**:没有多用户、权限、共享频道。
-- **UI 粗糙**:最小 chat。
-- **记忆简单**:全对话历史拼 prompt(无 summarization / archival 分层),agent 多了或对话长了会涨 token。PoC 够用,生产要加记忆压缩。
-- **C4 放弃**:非自托管 daemon(OrbStack 容器环境损坏,见 docs/12)。router 本地跑。
-- **无企业能力**:无 SSO/RBAC/审计。
-
-## 项目结构
+## What's here
 
 ```
 coforge/
-├── router/                 # coforge-router (Fastify + SQLite)
+├── router/                 # coforge-router (Fastify + node:sqlite)
 │   └── src/
-│       ├── server.ts       # /api/chat + /api/messages
-│       ├── agents.ts       # @mention 解析 + talkToAgent（拼 persona+记忆）
-│       ├── llm.ts          # 百炼 OpenAI 兼容调用
-│       ├── memory.ts       # agent 记忆持久化（SQLite）
-│       ├── queue.ts        # 串行队列
-│       ├── store.ts        # 频道消息历史（SQLite, node:sqlite 内置）
-│       ├── config.ts
+│       ├── server.ts       # POST /api/chat, GET /api/messages/:channel
+│       ├── agents.ts       # @mention parsing + talkToAgent (persona + memory)
+│       ├── llm.ts          # OpenAI-compatible chat-completions call
+│       ├── memory.ts       # per-agent memory, persisted to SQLite
+│       ├── store.ts        # channel message history, persisted to SQLite
+│       ├── queue.ts        # serial per-channel queue (sidesteps concurrency)
+│       ├── config.ts       # env + path resolution
 │       └── types.ts
-├── web/                    # 最小 React chat
+├── web/                    # minimal React chat (Vite)
 │   └── src/{App.tsx, api.ts, main.tsx, style.css}
-├── agents.json             # Noel/Pat/Sam 配置（persona）
+├── agents.json             # Noel / Pat / Sam — personas, editable
 ├── .env.example
-└── docs/                   # 完整分析
+└── docs/                   # design notes and analysis (the "why")
 ```
 
-## 排错
+The two pieces worth reading first are `router/src/agents.ts` (how a mention
+becomes a routed, memory-backed turn) and `router/src/memory.ts` (how a turn is
+stored and replayed). Together they are the whole idea.
 
-- **`Missing env var LLM_API_KEY`**:.env 没填 key
-- **`LLM call failed (401)`**:百炼 key 无效
-- **`LLM call failed (400)`**:model 名不对,确认 .env 的 LLM_MODEL
-- **router 端口占用**:改 .env 的 ROUTER_PORT
+## Quick start
+
+```bash
+# 1. configure — point at any OpenAI-compatible endpoint
+cp .env.example .env
+$EDITOR .env            # set LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
+
+# 2. router
+cd router && npm install && npm run dev      # :8787
+
+# 3. web (separate terminal)
+cd web && npm install && npm run dev         # http://localhost:5173
+```
+
+Then in the browser:
+
+```
+@Noel I'm Alex, working on a rendering engine
+```
+
+Refresh the page (or restart the router), then:
+
+```
+@Noel what's my name?
+```
+
+It answers "Alex" — because the turn is in `coforge.db`, not in memory. Ask
+`@Pat` the same question and it doesn't know; that's the isolation working.
+
+Edit `agents.json` to add or rename agents and change personas; restart the
+router to pick up changes.
+
+## Design notes
+
+- **Routing is a regex, not an orchestrator.** `@Name` is parsed once; the
+  named agent is the recipient. No capability matching, no fallback, no
+  delegation. Simple, and honestly limited.
+- **Memory is append-only history, not a knowledge graph.** A turn is a row;
+  recall is "replay all rows for this agent into the prompt." Cheap to reason
+  about, expensive at scale — see the non-goal above.
+- **The serial queue exists because concurrency was out of scope.** It is not
+  a feature; it is an explicit choice to not pretend to solve coordination.
+
+## Troubleshooting
+
+- `Missing env var LLM_API_KEY` — you didn't fill in `.env`.
+- `LLM call failed (401)` — bad key, or the key isn't valid for `LLM_BASE_URL`.
+- `LLM call failed (400)` — usually a wrong `LLM_MODEL` for that endpoint.
+- Port in use — change `ROUTER_PORT` / `WEB_PORT` in `.env`.
+
+## License
+
+MIT.

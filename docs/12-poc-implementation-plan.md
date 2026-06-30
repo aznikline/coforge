@@ -1,6 +1,6 @@
 # 12 · coforge PoC 实现计划
 
-> **Status**: 项目已定名 **coforge**(开发初期代号 slock)。本计划为实现前所写,实际执行有调整:放弃 Letta/LibreChat/Docker(OrbStack 损坏 + Letta 计费墙),改用自研记忆层 + 百炼 GLM-5.1。当前真实状态见根目录 README。以下原文保留作计划记录。
+> **Status**: The project is now named **coforge** (working codename was `slock`). This plan was written before execution; the actual build diverged — Letta/LibreChat/Docker were dropped (OrbStack broken + Letta billing wall) in favor of a self-contained SQLite memory layer and an OpenAI-compatible LLM call. See the root `README.md` for the real, current state. The text below is kept as a plan record.
 
 > 基于 [11 PoC Spec] + 调研确认的技术选型。前端改为**自造最小 React**（不 fork LibreChat，避免消息链路改造不可控）。这是 plan，审批后执行。
 

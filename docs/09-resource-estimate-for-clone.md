@@ -1,6 +1,6 @@
 # 09 · 做 Raft 平替需要投入多少资源
 
-> 问题：做一个 **Raft 平替**（coforge，开发初期代号 slock），要投入多少资源？
+> Question: how much resource does it take to build the **coforge** prototype (working codename `slock`)?
 >
 > **边界定义**："平替"= 复制 Raft 的核心体验（C1-C5 五能力够用即可），**不追求超越**（不含 [04] 的差异化层、不含 [08] 的绕路 feature）。即：一个能自托管、人机共享频道、named agent 有持久记忆、多 agent 基础协调、开箱即用的产品，体验上能替代 Raft 给小团队用。
 >

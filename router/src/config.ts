@@ -17,8 +17,8 @@ function required(name: string): string {
 
 export const config = {
   llmApiKey: required("LLM_API_KEY"),
-  llmBaseUrl: process.env.LLM_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",
-  llmModel: process.env.LLM_MODEL ?? "glm-5.1",
+  llmBaseUrl: process.env.LLM_BASE_URL ?? "https://api.openai.com/v1",
+  llmModel: process.env.LLM_MODEL ?? "gpt-4o-mini",
   routerPort: Number(process.env.ROUTER_PORT ?? 8787),
   agentsFile: process.env.AGENTS_FILE ?? join(PROJECT_ROOT, "agents.json"),
   dbPath: process.env.DB_PATH ?? join(PROJECT_ROOT, "coforge.db"),

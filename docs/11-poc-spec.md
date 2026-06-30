@@ -1,6 +1,6 @@
 # 11 · coforge PoC 技术 Spec
 
-> **Status**: 项目已定名 **coforge**(开发初期代号 slock)。本 spec 为实现前所写,实际实现有调整:放弃 Letta/LibreChat(计费墙 + 改造量大),改用自研极简记忆层 + 百炼 GLM-5.1 + 自造最小 React 前端。当前真实状态见根目录 README。以下原文保留作设计记录。
+> **Status**: The project is now named **coforge** (working codename was `slock`). This spec was written before implementation; the actual build diverged — Letta/LibreChat were dropped (billing wall + large改造 surface) in favor of a self-contained memory layer in SQLite, an OpenAI-compatible LLM call (bring-your-own-key), and a minimal React frontend. See the root `README.md` for the real, current state. The text below is kept as a design record.
 
 > **范围**：最小可验证 PoC。单人 + 多 agent 场景。验证"Claude Code 直接做"能否跑通 Raft 的核心体验。
 > **目标**：能 demo，不追求 C3 正确性。

@@ -11,7 +11,7 @@ It is **not** a production collaboration platform. It is a compact, readable
 reference for how persistent identity, per-agent memory, and in-channel routing
 fit together — small enough to read end to end in an afternoon.
 
-## What this is (honest)
+## What this is
 
 - A single channel with `@mention` routing — `@Noel`, `@Pat`, `@Sam` each route
   to a distinct agent with its own persona and its own memory.

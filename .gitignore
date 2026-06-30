@@ -1,0 +1,18 @@
+# secrets
+.env
+
+# build / runtime
+node_modules/
+dist/
+coforge.db
+coforge.db-*
+*.db
+*.db-*
+*.tsbuildinfo
+
+# claude session artifacts
+.claude/scheduled_tasks.lock
+.claude/session/
+
+# os
+.DS_Store

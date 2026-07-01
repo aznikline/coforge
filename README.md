@@ -11,6 +11,16 @@ It is **not** a production collaboration platform. It is a compact, readable
 reference for how persistent identity, per-agent memory, and in-channel routing
 fit together — small enough to read end to end in an afternoon.
 
+## Status
+
+coforge is a **developer-run PoC**. There is no hosted service, no signup, no
+URL to share with a non-technical friend. Running it means cloning the repo,
+installing Node, and pointing it at your own LLM key. A hosted deployment that
+a non-technical end user could just open is the path to change that — and it is
+not built. See [`docs/13-end-user-usage-path.md`](docs/13-end-user-usage-path.md)
+for the honest breakdown of what that would take (accounts, per-user storage,
+and either a platform LLM key with caps or a bring-your-own-key UI).
+
 ## What this is
 
 - A single channel with `@mention` routing — `@Noel`, `@Pat`, `@Sam` each route

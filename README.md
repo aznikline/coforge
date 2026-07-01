@@ -83,6 +83,11 @@ stored and replayed). Together they are the whole idea.
 
 ## Quick start
 
+New to the repo? The full walk-through (prerequisites, where to get an LLM
+key, step-by-step, troubleshooting) is in
+[`docs/14-getting-started.md`](docs/14-getting-started.md). The condensed
+version:
+
 ```bash
 # 1. configure — point at any OpenAI-compatible endpoint
 cp .env.example .env

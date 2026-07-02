@@ -118,25 +118,24 @@ operating-system abstraction is conspicuously absent.
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
 implies. Two are measured below.
 
-\begin{table*}[t]
-\caption{Each workaround the workspace admits maps onto an OS abstraction
-that would remove it. The right column names the AgenticOS topic area
-the abstraction belongs to.}
+\begin{table}[t]
+\caption{Each workaround maps to an OS abstraction that would remove it.}
 \label{tab:map}
 \small
-\begin{tabular}{p{0.30\linewidth} p{0.32\linewidth} p{0.30\linewidth}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{0.46\linewidth} p{0.46\linewidth}}
 \toprule
-Workspace workaround & What it hand-rolls & OS abstraction wanted \\
+Workaround (what is hand-rolled) & OS abstraction wanted \\
 \midrule
-Serial per-channel queue & Sidesteps multi-agent concurrency & Semantics-aware agent scheduling \\
-Full history replayed into prompt & No compression, no episodic layer & Long-lived managed state for agent context \\
-All agents in one process + one DB & No boundary between agents & Execute-only / attested isolation \\
-Personas written as JSON & Hand-authored capability bundles & Skills as the unit of composition \\
-\texttt{@Name} regex routing & No capability matching or delegation & Agent-facing interface / IPC \\
-Memory on a local SQLite file & No managed memory object & Agent state as an OS object \\
+Serial queue (no concurrency) & Semantics-aware agent scheduling \\
+Full-history replay (no compression) & Long-lived managed state \\
+One process + one DB (no boundary) & Execute-only / attested isolation \\
+JSON personas (hand-authored) & Skills as unit of composition \\
+\texttt{@Name} regex (no matching) & Agent-facing interface / IPC \\
+SQLite file (no managed object) & Agent state as OS object \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
 \subsection{Measured: the serial queue}
 
@@ -252,4 +251,5 @@ AgenticOS @ ASPLOS 2026.
 
 \end{thebibliography}
 
+\balance
 \end{document}

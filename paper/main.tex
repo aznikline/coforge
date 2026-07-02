@@ -25,14 +25,14 @@
 \begin{abstract}
 AI agents are becoming long-lived services that plan, invoke tools, and
 persist state, yet they are still hosted by application-layer workspaces
-built on operating-system abstractions drawn for static workloads. We built
-and ran such a workspace---an open-source, multi-agent chat application with
-persistent per-agent memory---and report where its implementation hit walls
-that are not application problems but missing-primitive problems: at each
-wall the workspace was forced into a degraded workaround. We enumerate six
-workarounds, measure two, and map each onto an OS abstraction that would
-remove it. The contribution is not a new OS; it is consumer-side evidence for
-the set of abstractions the agent era is starved for.
+built on operating-system abstractions designed for static workloads. We
+built and ran such a workspace---an open-source, multi-agent chat
+application with persistent per-agent memory---and report where its
+implementation hit walls that are missing OS abstractions. We enumerate
+six workarounds, measure two, and map
+each onto an OS abstraction that would remove it. The contribution is
+consumer-side evidence, not a new OS, for the set of abstractions the
+agent era is starved for.
 \end{abstract}
 
 \maketitle
@@ -69,11 +69,6 @@ history length. Each is technically re-implementable in user space, but
 only by re-building, per application, the scheduling and managed-state
 primitives that belong one layer down---and by getting their corner cases
 right every time.
-
-We are explicit throughout about what we are \emph{not} claiming
-(§\ref{sec:notclaiming}): no new operating system, no claim that any
-particular abstraction is the correct one---only that a real application,
-by stating its walls, enumerates abstractions the agent stack lacks.
 
 \section{The workspace}
 
@@ -116,10 +111,9 @@ operating-system abstraction is conspicuously absent.
 \section{Workarounds and the abstractions they want}
 
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
-implies. Two are measured below. Measurements are single runs on a
-developer laptop against one OpenAI-compatible model (glm-5.1); they are
-illustrative of the growth shape, not a benchmark. The harness and raw
-numbers are reproducible from the artifact (anonymized for review).
+implies. Two are measured below: single runs on a developer laptop against
+one OpenAI-compatible model (glm-5.1), reproducible from the artifact
+(anonymized for review).
 
 \begin{table}[t]
 \caption{Each workaround maps to an OS abstraction that would remove it.}
@@ -211,8 +205,7 @@ isolation~\cite{execonly,grimlock} corresponds to our isolation row;
 skills as a composition unit~\cite{skillos} corresponds to our persona row;
 agent-facing interface redesign~\cite{rethos} corresponds to our routing
 row. The agreement is the point: the abstractions an application is starved
-for are the same ones the OS community is beginning to build. Consumer-side
-evidence corroborates the producer-side agenda.
+for are the same ones the OS community is beginning to build.
 
 \section{What we are not claiming}
 \label{sec:notclaiming}
@@ -224,10 +217,9 @@ representative of all agent applications; we claim that any application
 with its shape---persistent, multi-agent, capability-routed---will hit the
 same walls because the walls are in the runtime contract. We do not claim
 these abstractions are easy; we claim their absence is expensive, and we
-have the measurements to show it. The measurements themselves are limited:
-single-run, one model, one agent, eight turns---no seeds, no confidence
-intervals, no hardware sweep. They establish the growth \emph{shape} of two
-walls, not their magnitude.
+have the measurements to show it. The measurements are limited: single-run,
+one model, one agent, eight turns---no seeds, CIs, or hardware sweep. They
+show the growth \emph{shape} of two walls, not their magnitude.
 
 \section{Conclusion}
 
@@ -251,25 +243,24 @@ SOSP 2026 (2nd edition); ASPLOS 2026 (1st edition).
 \bibitem{agentcgroup}
 Y.~Zheng, J.~Fan, Q.~Fu, Y.~Yang, W.~Zhang, A.~Quinn.
 \emph{AgentCgroup: Understanding and Controlling OS Resources of AI
-Agents.} AgenticOS @ ASPLOS 2026.
+Agents.} AgenticOS 2026.
 
 \bibitem{skillos}
 L.~Chen, Z.~Wang, W.~Zheng, E.~Feng, D.~Du, Y.~Xia, H.~Chen.
 \emph{Skills are the new Apps---Now It Is Time for Skill OS.}
-AgenticOS @ ASPLOS 2026.
+AgenticOS 2026.
 
 \bibitem{execonly}
 R.~Tiwari, D.~Williams. \emph{Execute-Only Agents: Architectural Defense
-Against Prompt Injection for AI Agents.} AgenticOS @ ASPLOS 2026.
+Against Prompt Injection for AI Agents.} AgenticOS 2026.
 
 \bibitem{grimlock}
-Q.~Wu, W.~Zhang, G.~Fang, S.~Mao, B.~Gao, D.~Levitsky, S.~M.~Butterworth,
-R.~Cameron. \emph{Grimlock: Guarding High-Agency Systems with eBPF and
-Attested Channels.} AgenticOS @ ASPLOS 2026.
+Q.~Wu, W.~Zhang, G.~Fang, et~al. \emph{Grimlock: Guarding High-Agency Systems
+with eBPF and Attested Channels.} AgenticOS 2026.
 
 \bibitem{rethos}
 Y.~Wang, M.~Li, H.~Chen. \emph{Rethinking OS Interfaces for LLM Agents.}
-AgenticOS @ ASPLOS 2026.
+AgenticOS 2026.
 
 \end{thebibliography}
 }

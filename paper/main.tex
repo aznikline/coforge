@@ -168,19 +168,33 @@ application requests rather than implements.
 
 A reviewer may object that the items in Table~\ref{tab:map} are missing
 \emph{features}, not missing \emph{abstractions}. The distinction is the
-contribution. A feature is private to one application; an abstraction is a
-contract many applications share and that the layer beneath them
-guarantees.
+contribution, so we give a falsifiable test: \emph{a requirement is an
+abstraction, not a feature, when any application-layer implementation of it
+is necessarily best-effort and cannot be verified correct in isolation.} A
+feature lives inside one program's logic and can be made correct there; an
+abstraction is a contract that must be guaranteed by the layer beneath, or
+not at all.
 
-Each row passes this test. Any agent workspace---not only
-ours---that lets agents persist, collaborate, or be selected by capability
-will hit the same wall, because the wall is in the contract between the
-application and its runtime, not in the application's logic. Concurrency
-between agents is a scheduling contract; durable, compressible context is a
-managed-state contract; preventing one agent from reading another is an
-isolation contract; routing work by capability is an interface contract.
-These are the shapes of OS abstractions. The fact that a few-hundred-line
-application is forced to hand-roll all of them, badly, is the evidence.
+Isolation is the clearest case. An application can ask agents not to read
+each other's state, but any boundary it draws is advisory: a bug, a
+misconfigured tool call, or a prompt-injected agent can step over it, and
+the application has no vantage point from which to detect the crossing.
+Only the runtime, which mediates every memory access, can enforce a
+boundary that holds against a hostile or buggy agent. The same structure
+repeats across the rows: concurrency safety cannot be verified by a program
+that is itself one of the concurrent parties; durable, compressible context
+cannot be managed correctly by the process whose own state is being
+compressed; capability routing cannot be trusted when the router runs
+inside the routed process. In each case the application is both the enforcer
+and the enforced-upon, so its enforcement is best-effort by construction.
+
+This is also why the walls are not specific to our workspace. Any
+application that lets agents persist, collaborate, or be selected by
+capability occupies the same position---enforcer and enforced-upon at
+once---and hits the same walls, because the walls are in the contract
+between the application and its runtime, not in the application's logic.
+The fact that a few-hundred-line application is forced to hand-roll all of
+these, badly, is the evidence.
 
 \section{Relation to the AgenticOS agenda}
 

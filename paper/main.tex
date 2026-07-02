@@ -25,16 +25,14 @@
 \begin{abstract}
 AI agents are becoming long-lived services that plan, invoke tools, and
 persist state, yet they are still hosted by application-layer workspaces
-built on top of operating-system abstractions designed for static workloads.
-We built and ran such a workspace---an open-source, multi-agent chat
-application with persistent per-agent memory---and report where its
-implementation hit walls that are not application problems but
-\emph{missing-OS-primitive} problems. At each wall the workspace was forced
-into a degraded workaround. We enumerate six workarounds, measure two of
-them, and map each onto an operating-system abstraction that, if it existed,
-would remove the workaround. The contribution is not a new OS; it is
-evidence, from the consumer side of the OS interface, for the set of
-abstractions the agent era is starved for.
+built on operating-system abstractions drawn for static workloads. We built
+and ran such a workspace---an open-source, multi-agent chat application with
+persistent per-agent memory---and report where its implementation hit walls
+that are not application problems but missing-primitive problems: at each
+wall the workspace was forced into a degraded workaround. We enumerate six
+workarounds, measure two, and map each onto an OS abstraction that would
+remove it. The contribution is not a new OS; it is consumer-side evidence for
+the set of abstractions the agent era is starved for.
 \end{abstract}
 
 \maketitle
@@ -56,9 +54,9 @@ schedulers, new isolation models. This paper offers evidence from the
 \emph{consumer} side. We built and operate a real, open-source agent
 workspace---a multi-agent chat application in which a human routes work to
 named agents via channel mentions, and each agent retains memory across
-sessions. The application is small (a few hundred lines) and deliberately
-honest about what it does not do. We found that at every hard problem, the
-limiting factor was not the application's logic but the absence of an
+sessions. The application is small (a few hundred lines) and states its
+non-goals explicitly. We found that at every hard problem, the limiting
+factor was not the application's logic but the absence of an
 operating-system abstraction that should plausibly exist.
 
 The contribution is the mapping. Each of the workspace's admitted
@@ -66,9 +64,10 @@ workarounds corresponds to an OS-level abstraction that would dissolve it.
 We measure two of these workarounds to show they are not cosmetic: a serial
 execution queue whose latency grows linearly with concurrency, and a
 prompt-replay memory scheme whose input-token cost grows linearly with
-history length. Neither is fixable inside the application without
-re-implementing, in user space, the scheduling and managed-state
-primitives that belong one layer down.
+history length. Each is technically re-implementable in user space, but
+only by re-building, per application, the scheduling and managed-state
+primitives that belong one layer down---and by getting their corner cases
+right every time.
 
 We are explicit about what we are \emph{not} claiming: we do not propose a
 new operating system, nor argue that any particular abstraction is the
@@ -91,8 +90,8 @@ the host Node runtime's built-in SQLite module; no external agent
 framework, vector database, or daemon is involved. The system is deployed
 and used.
 
-What makes it useful as evidence is not its capability but its honesty
-about what it lacks. By design, it has:
+What makes the system useful as evidence is not its capability but the
+explicitness of its non-goals. By design, it has:
 
 \begin{itemize}
   \item \textbf{No multi-agent concurrency.} Messages in a channel are
@@ -142,14 +141,14 @@ SQLite file (no managed object) & Agent state as OS object \\
 Because the workspace provides no agent scheduling, concurrent requests to
 one channel serialize. We fired $N$ concurrent mentions at a channel for
 $N \in \{1,2,4,8\}$ and measured end-to-end latency. Wall-clock time grew
-near-linearly: 3.3\,s, 7.0\,s, 13.9\,s, 27.3\,s for $N=1,2,4,8$. The eighth
+linearly: 3.3\,s, 7.0\,s, 13.9\,s, 27.3\,s for $N=1,2,4,8$---the eighth
 request waited over 27 seconds for seven predecessors. This is not a slow
-model; it is \emph{no scheduling layer at all}, forcing the application to
-impose a global order it has no basis to choose. An OS that accounted for
-agents as first-class schedulable entities---with their intent, priority,
-and exploration semantics---could reorder, batch, or interleave these
-requests. The application cannot, because the abstraction does not exist
-beneath it.
+model; it is a \emph{degenerate scheduler} that imposes a global order the
+application has no basis to choose. An OS that accounted for agents as
+first-class schedulable entities---with their intent, priority, and
+exploration semantics---could reorder, batch, or interleave these requests.
+The application can only fall back to a queue because no such abstraction
+exists beneath it.
 
 \subsection{Measured: prompt-replay memory}
 
@@ -157,12 +156,12 @@ Because the workspace provides no managed memory abstraction, it replays
 the full conversation history into the prompt on every turn. We held an
 8-turn conversation with one agent and read the model's reported input
 token count per turn. Prompt tokens grew
-39, 81, 118, 142, 173, 206, 240, 308---roughly an eightfold increase over
-eight turns, tracking history length linearly. Each turn re-pays for every
-prior turn. A long-running agent that lives for days, as the AgenticOS
-position assumes, becomes unaffordable under this scheme. The fix is not
-a better application prompt; it is a memory object the runtime manages:
-episodic storage with compression, recall, and eviction policies that the
+39, 81, 118, 142, 173, 206, 240, 308---tracking history length linearly,
+so each turn re-pays for every prior turn. An agent that persists across
+days or weeks, as the AgenticOS position assumes, becomes costly under
+this scheme well before it becomes unusable. The fix is not a better
+application prompt; it is a memory object the runtime manages: episodic
+storage with compression, recall, and eviction policies that the
 application requests rather than implements.
 
 \section{Why these are abstractions, not features}
@@ -194,8 +193,7 @@ isolation~\cite{execonly,grimlock} corresponds to our isolation row;
 skills as a composition unit~\cite{skillos} corresponds to our persona row;
 agent-facing interface redesign~\cite{rethos} corresponds to our routing
 row. The agreement is the point: the abstractions an application is starved
-for are
-the same ones the OS community is beginning to build. The consumer-side
+for are the same ones the OS community is beginning to build. Consumer-side
 evidence corroborates the producer-side agenda.
 
 \section{What we are not claiming}
@@ -211,9 +209,10 @@ expensive, and we have the measurements to show it.
 
 \section{Conclusion}
 
-An honest application-layer agent workspace is a measuring instrument for
-the abstractions its operating system lacks. We built one, measured two of
-its walls, and mapped six to OS-level abstractions the agent era needs.
+An application-layer agent workspace that states its non-goals explicitly is
+a measuring instrument for the abstractions its operating system lacks. We
+built one, measured two of its walls, and mapped six to OS-level
+abstractions the agent era needs.
 The hope is that consumer-side evidence of this kind complements the
 producer-side primitives the community is beginning to propose, and that
 the contract between agent applications and their runtime becomes

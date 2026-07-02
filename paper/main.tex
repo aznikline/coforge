@@ -41,7 +41,7 @@ agent era is starved for.
 
 Operating systems expose processes, threads, files, sockets, and resource
 controllers as the units of execution, composition, and accounting. These
-abstractions were drawn for workloads that are static, predictable, and
+abstractions were designed for workloads that are static, predictable, and
 short-lived relative to human attention. AI agents invert all three
 properties: they are long-lived, semantically adaptive, and interact with
 tools and environments in ways the runtime cannot predict. A recent workshop
@@ -84,7 +84,7 @@ The implementation comprises a Node.js HTTP router, a SQLite store for
 channel history and per-agent memory, and a minimal web frontend. It uses
 the host Node runtime's built-in SQLite module; no external agent
 framework, vector database, or daemon is involved. The system is deployed
-and used.
+for our own use.
 
 What makes the system useful as evidence is not its capability but the
 explicitness of its non-goals. By design, it has:

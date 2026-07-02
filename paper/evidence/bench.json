@@ -1,0 +1,114 @@
+{
+  "llm_model": "glm-5.1",
+  "measurement_1_serial_queue": [
+    {
+      "concurrent_requests": 1,
+      "per_request_latency_s": [
+        3.33
+      ],
+      "wall_clock_s": 3.34,
+      "note": "serial queue: requests processed one-at-a-time, latency stacks"
+    },
+    {
+      "concurrent_requests": 2,
+      "per_request_latency_s": [
+        5.88,
+        7.01
+      ],
+      "wall_clock_s": 7.01,
+      "note": "serial queue: requests processed one-at-a-time, latency stacks"
+    },
+    {
+      "concurrent_requests": 4,
+      "per_request_latency_s": [
+        6.17,
+        8.53,
+        9.88,
+        13.93
+      ],
+      "wall_clock_s": 13.93,
+      "note": "serial queue: requests processed one-at-a-time, latency stacks"
+    },
+    {
+      "concurrent_requests": 8,
+      "per_request_latency_s": [
+        3.82,
+        9.3,
+        12.59,
+        14.4,
+        19.83,
+        21.53,
+        23.91,
+        27.25
+      ],
+      "wall_clock_s": 27.25,
+      "note": "serial queue: requests processed one-at-a-time, latency stacks"
+    }
+  ],
+  "measurement_2_prompt_replay": [
+    {
+      "turn": 1,
+      "history_turns_in_prompt": 3,
+      "prompt_tokens": 39,
+      "completion_tokens": 73,
+      "latency_s": 3.19,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 2,
+      "history_turns_in_prompt": 5,
+      "prompt_tokens": 81,
+      "completion_tokens": 53,
+      "latency_s": 2.25,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 3,
+      "history_turns_in_prompt": 7,
+      "prompt_tokens": 118,
+      "completion_tokens": 43,
+      "latency_s": 3.32,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 4,
+      "history_turns_in_prompt": 9,
+      "prompt_tokens": 142,
+      "completion_tokens": 42,
+      "latency_s": 2.17,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 5,
+      "history_turns_in_prompt": 11,
+      "prompt_tokens": 173,
+      "completion_tokens": 54,
+      "latency_s": 4.25,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 6,
+      "history_turns_in_prompt": 13,
+      "prompt_tokens": 206,
+      "completion_tokens": 66,
+      "latency_s": 6.04,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 7,
+      "history_turns_in_prompt": 15,
+      "prompt_tokens": 240,
+      "completion_tokens": 109,
+      "latency_s": 4.22,
+      "note": "full history replayed into prompt every turn"
+    },
+    {
+      "turn": 8,
+      "history_turns_in_prompt": 17,
+      "prompt_tokens": 308,
+      "completion_tokens": 85,
+      "latency_s": 3.76,
+      "note": "full history replayed into prompt every turn"
+    }
+  ]
+}

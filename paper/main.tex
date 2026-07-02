@@ -1,0 +1,255 @@
+%% AgenticOS 2026 (SOSP) vision paper submission.
+%% Double-blind: do not identify authors or the system's public identity.
+%% Bibliography is hand-rolled (thebibliography), so no bibtex pass is needed.
+%% Compile:  pdflatex main && pdflatex main   (twice, for refs/table)
+%% Or drop into Overleaf (acmart is standard there; pick pdflatex compiler).
+%%
+%% Evidence for the two measured rows lives in evidence/bench.json
+%% (reproducible via evidence/bench.py against a running coforge-router).
+
+\documentclass[sigconf, review, anonymous]{acmart}
+%% 'anonymous' hides author block for double-blind review.
+%% 'review' adds line numbers for reviewers.
+%% acmart already loads hyperref, graphicx, xcolor — do not re-load.
+
+\usepackage{booktabs}
+\usepackage{array}
+
+\begin{document}
+
+\title{What an Agent Workspace Reveals About the Abstractions Its Operating System Is Missing}
+
+\author{Anonymous}
+\affiliation{\institution{Anonymized for double-blind review}}
+
+\begin{abstract}
+AI agents are becoming long-lived services that plan, invoke tools, and
+persist state, yet they are still hosted by application-layer workspaces
+built on top of operating-system abstractions designed for static workloads.
+We built and ran such a workspace---an open-source, multi-agent chat
+application with persistent per-agent memory---and report where its
+implementation hit walls that are not application problems but
+\emph{missing-OS-primitive} problems. At each wall the workspace was forced
+into a degraded workaround. We enumerate six workarounds, measure two of
+them, and map each onto an operating-system abstraction that, if it existed,
+would remove the workaround. The contribution is not a new OS; it is
+evidence, from the consumer side of the OS interface, for the set of
+abstractions the agent era is starved for.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Operating systems expose processes, threads, files, sockets, and resource
+controllers as the units of execution, composition, and accounting. These
+abstractions were drawn for workloads that are static, predictable, and
+short-lived relative to human attention. AI agents invert all three
+properties: they are long-lived, semantically adaptive, and interact with
+tools and environments in ways the runtime cannot predict. A recent workshop
+series argues that this mismatch is not incidental but structural, and that
+operating systems themselves must become \emph{agentic}~\cite{agenticos}.
+
+Most of the evidence offered for this claim comes from the
+\emph{producer} side of the OS interface: new kernel primitives, new
+schedulers, new isolation models. This paper offers evidence from the
+\emph{consumer} side. We built and operate a real, open-source agent
+workspace---a multi-agent chat application in which a human routes work to
+named agents via channel mentions, and each agent retains memory across
+sessions. The application is small (a few hundred lines) and deliberately
+honest about what it does not do. We found that at every hard problem, the
+limiting factor was not the application's logic but the absence of an
+operating-system abstraction that should plausibly exist.
+
+The contribution is the mapping. Each of the workspace's admitted
+workarounds corresponds to an OS-level abstraction that would dissolve it.
+We measure two of these workarounds to show they are not cosmetic: a serial
+execution queue whose latency grows linearly with concurrency, and a
+prompt-replay memory scheme whose input-token cost grows linearly with
+history length. Neither is fixable inside the application without
+re-implementing, in user space, the scheduling and managed-state
+primitives that belong one layer down.
+
+We are explicit about what we are \emph{not} claiming: we do not propose a
+new operating system, nor argue that any particular abstraction is the
+correct one. We argue that a real application, by being honest about its
+walls, enumerates the abstractions the agent stack lacks.
+
+\section{The workspace}
+
+The system is an open-source agent workspace (anonymized for review). A
+human types into a single chat channel; messages beginning with
+\texttt{@Name} are routed to the named agent. Each agent has a persona and a
+private, append-only memory. On each turn the agent's full history is
+replayed into the prompt, the model is invoked through a standard
+OpenAI-compatible endpoint, and the reply is stored back. Memory is
+isolated per agent: a fact told to one agent is not visible to another.
+
+The implementation comprises a Node.js HTTP router, a SQLite store for
+channel history and per-agent memory, and a minimal web frontend. It uses
+the host Node runtime's built-in SQLite module; no external agent
+framework, vector database, or daemon is involved. The system is deployed
+and used.
+
+What makes it useful as evidence is not its capability but its honesty
+about what it lacks. By design, it has:
+
+\begin{itemize}
+  \item \textbf{No multi-agent concurrency.} Messages in a channel are
+        processed through one serial queue. Two agents cannot act on the
+        same state at the same time.
+  \item \textbf{No memory compression.} The entire history is replayed
+        into the prompt on every turn. There is no summarization or
+        archival layer.
+  \item \textbf{No inter-agent isolation.} All agents share one process
+        and one database; there is no boundary preventing one agent from
+        reading another's state.
+  \item \textbf{No capability routing.} A mention is parsed by a regular
+        expression; there is no matching of work to the agent best suited
+        for it, and no delegation between agents.
+\end{itemize}
+
+These are not oversights. Each is a deliberate non-goal that kept the
+implementation readable. We now argue that each is also a place where an
+operating-system abstraction is conspicuously absent.
+
+\section{Workarounds and the abstractions they want}
+
+Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
+implies. Two are measured below.
+
+\begin{table*}[t]
+\caption{Each workaround the workspace admits maps onto an OS abstraction
+that would remove it. The right column names the AgenticOS topic area
+the abstraction belongs to.}
+\label{tab:map}
+\small
+\begin{tabular}{p{0.30\linewidth} p{0.32\linewidth} p{0.30\linewidth}}
+\toprule
+Workspace workaround & What it hand-rolls & OS abstraction wanted \\
+\midrule
+Serial per-channel queue & Sidesteps multi-agent concurrency & Semantics-aware agent scheduling \\
+Full history replayed into prompt & No compression, no episodic layer & Long-lived managed state for agent context \\
+All agents in one process + one DB & No boundary between agents & Execute-only / attested isolation \\
+Personas written as JSON & Hand-authored capability bundles & Skills as the unit of composition \\
+\texttt{@Name} regex routing & No capability matching or delegation & Agent-facing interface / IPC \\
+Memory on a local SQLite file & No managed memory object & Agent state as an OS object \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Measured: the serial queue}
+
+Because the workspace provides no agent scheduling, concurrent requests to
+one channel serialize. We fired $N$ concurrent mentions at a channel for
+$N \in \{1,2,4,8\}$ and measured end-to-end latency. Wall-clock time grew
+near-linearly: 3.3\,s, 7.0\,s, 13.9\,s, 27.3\,s for $N=1,2,4,8$. The eighth
+request waited over 27 seconds for seven predecessors. This is not a slow
+model; it is \emph{no scheduling layer at all}, forcing the application to
+impose a global order it has no basis to choose. An OS that accounted for
+agents as first-class schedulable entities---with their intent, priority,
+and exploration semantics---could reorder, batch, or interleave these
+requests. The application cannot, because the abstraction does not exist
+beneath it.
+
+\subsection{Measured: prompt-replay memory}
+
+Because the workspace provides no managed memory abstraction, it replays
+the full conversation history into the prompt on every turn. We held an
+8-turn conversation with one agent and read the model's reported input
+token count per turn. Prompt tokens grew
+39, 81, 118, 142, 173, 206, 240, 308---roughly an eightfold increase over
+eight turns, tracking history length linearly. Each turn re-pays for every
+prior turn. A long-running agent that lives for days, as the AgenticOS
+position assumes, becomes unaffordable under this scheme. The fix is not
+a better application prompt; it is a memory object the runtime manages:
+episodic storage with compression, recall, and eviction policies that the
+application requests rather than implements.
+
+\section{Why these are abstractions, not features}
+
+A reviewer may object that the items in Table~\ref{tab:map} are missing
+\emph{features}, not missing \emph{abstractions}. The distinction is the
+contribution. A feature is private to one application; an abstraction is a
+contract many applications share and that the layer beneath them
+guarantees.
+
+Each row passes this test. Any agent workspace---not only
+ours---that lets agents persist, collaborate, or be selected by capability
+will hit the same wall, because the wall is in the contract between the
+application and its runtime, not in the application's logic. Concurrency
+between agents is a scheduling contract; durable, compressible context is a
+managed-state contract; preventing one agent from reading another is an
+isolation contract; routing work by capability is an interface contract.
+These are the shapes of OS abstractions. The fact that a few-hundred-line
+application is forced to hand-roll all of them, badly, is the evidence.
+
+\section{Relation to the AgenticOS agenda}
+
+The mapping aligns with topics the AgenticOS community has already
+identified from the producer side. Agent-aware resource
+control~\cite{agentcgroup} corresponds to our scheduling row; long-lived
+state abstractions for agent context and memory~\cite{agenticos} correspond
+to our replay row; execute-only and attested-channel
+isolation~\cite{execonly,grimlock} corresponds to our isolation row;
+skills as a composition unit~\cite{skillos} corresponds to our persona row;
+agent-facing interface redesign~\cite{rethos} corresponds to our routing
+row. The agreement is the point: the abstractions an application is starved
+for are
+the same ones the OS community is beginning to build. The consumer-side
+evidence corroborates the producer-side agenda.
+
+\section{What we are not claiming}
+
+We do not claim a new operating system. We do not claim that the
+abstractions named in Table~\ref{tab:map} are the \emph{correct} ones, only
+that they are \emph{wanted}. We do not claim the workspace is
+representative of all agent applications; we claim that any application
+with its shape---persistent, multi-agent, capability-routed---will hit the
+same walls because the walls are in the runtime contract. Finally, we do
+not claim these abstractions are easy; we claim their absence is
+expensive, and we have the measurements to show it.
+
+\section{Conclusion}
+
+An honest application-layer agent workspace is a measuring instrument for
+the abstractions its operating system lacks. We built one, measured two of
+its walls, and mapped six to OS-level abstractions the agent era needs.
+The hope is that consumer-side evidence of this kind complements the
+producer-side primitives the community is beginning to propose, and that
+the contract between agent applications and their runtime becomes
+something the application requests rather than re-implements.
+
+\begin{thebibliography}{9}
+
+\bibitem{agenticos}
+AgenticOS Workshop Series. \emph{Operating Systems Design for AI Agents.}
+SOSP 2026 (2nd edition); ASPLOS 2026 (1st edition).
+\url{https://os-for-agent.github.io/}
+
+\bibitem{agentcgroup}
+Y.~Zheng, J.~Fan, Q.~Fu, Y.~Yang, W.~Zhang, A.~Quinn.
+\emph{AgentCgroup: Understanding and Controlling OS Resources of AI
+Agents.} AgenticOS @ ASPLOS 2026.
+
+\bibitem{skillos}
+L.~Chen, Z.~Wang, W.~Zheng, E.~Feng, D.~Du, Y.~Xia, H.~Chen.
+\emph{Skills are the new Apps---Now It Is Time for Skill OS.}
+AgenticOS @ ASPLOS 2026.
+
+\bibitem{execonly}
+R.~Tiwari, D.~Williams. \emph{Execute-Only Agents: Architectural Defense
+Against Prompt Injection for AI Agents.} AgenticOS @ ASPLOS 2026.
+
+\bibitem{grimlock}
+Q.~Wu, W.~Zhang, G.~Fang, S.~Mao, B.~Gao, D.~Levitsky, S.~M.~Butterworth,
+R.~Cameron. \emph{Grimlock: Guarding High-Agency Systems with eBPF and
+Attested Channels.} AgenticOS @ ASPLOS 2026.
+
+\bibitem{rethos}
+Y.~Wang, M.~Li, H.~Chen. \emph{Rethinking OS Interfaces for LLM Agents.}
+AgenticOS @ ASPLOS 2026.
+
+\end{thebibliography}
+
+\end{document}

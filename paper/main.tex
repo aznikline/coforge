@@ -12,6 +12,18 @@
 %% 'review' adds line numbers for reviewers.
 %% acmart already loads hyperref, graphicx, xcolor — do not re-load.
 
+%% Venue — replaces the default "Conference'17, July 2017, Washington, DC" placeholder.
+%% Workshop has no formal proceedings, so we set copyright to none and omit
+%% ISBN/DOI/price (which would otherwise render as fake placeholder values).
+\setcopyright{none}
+\settopmatter{printacmref=false, printccs=false, printfolios=false}
+\acmConference{2nd Workshop on Operating Systems Design for AI Agents (AgenticOS)}{September 29, 2026}{Prague, Czechia}
+\acmYear{2026}
+%% No formal proceedings → suppress fake ISBN/DOI/price placeholders.
+\acmISBN{}
+\acmDOI{}
+\acmPrice{}
+
 \usepackage{booktabs}
 \usepackage{array}
 

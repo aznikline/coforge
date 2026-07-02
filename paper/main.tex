@@ -59,8 +59,9 @@ non-goals explicitly. We found that at every hard problem, the limiting
 factor was not the application's logic but the absence of an
 operating-system abstraction that should plausibly exist.
 
-The contribution is the mapping. Each of the workspace's admitted
-workarounds corresponds to an OS-level abstraction that would dissolve it.
+This is a position paper, not a new system: the contribution is the mapping.
+Each of the workspace's admitted workarounds corresponds to an OS-level
+abstraction that would dissolve it.
 We measure two of these workarounds to show they are not cosmetic: a serial
 execution queue whose latency grows linearly with concurrency, and a
 prompt-replay memory scheme whose input-token cost grows linearly with
@@ -115,7 +116,10 @@ operating-system abstraction is conspicuously absent.
 \section{Workarounds and the abstractions they want}
 
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
-implies. Two are measured below.
+implies. Two are measured below. Measurements are single runs on a
+developer laptop against one OpenAI-compatible model (glm-5.1); they are
+illustrative of the growth shape, not a benchmark. The harness and raw
+numbers are reproducible from the artifact (anonymized for review).
 
 \begin{table}[t]
 \caption{Each workaround maps to an OS abstraction that would remove it.}
@@ -218,9 +222,12 @@ abstractions named in Table~\ref{tab:map} are the \emph{correct} ones, only
 that they are \emph{wanted}. We do not claim the workspace is
 representative of all agent applications; we claim that any application
 with its shape---persistent, multi-agent, capability-routed---will hit the
-same walls because the walls are in the runtime contract. Finally, we do
-not claim these abstractions are easy; we claim their absence is
-expensive, and we have the measurements to show it.
+same walls because the walls are in the runtime contract. We do not claim
+these abstractions are easy; we claim their absence is expensive, and we
+have the measurements to show it. The measurements themselves are limited:
+single-run, one model, one agent, eight turns---no seeds, no confidence
+intervals, no hardware sweep. They establish the growth \emph{shape} of two
+walls, not their magnitude.
 
 \section{Conclusion}
 

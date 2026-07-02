@@ -17,7 +17,7 @@
 
 \begin{document}
 
-\title{What an Agent Workspace Reveals About the Abstractions Its Operating System Is Missing}
+\title{Six Missing Abstractions: Evidence from an Agent Workspace}
 
 \author{Anonymous}
 \affiliation{\institution{Anonymized for double-blind review}}
@@ -69,10 +69,10 @@ only by re-building, per application, the scheduling and managed-state
 primitives that belong one layer down---and by getting their corner cases
 right every time.
 
-We are explicit about what we are \emph{not} claiming: we do not propose a
-new operating system, nor argue that any particular abstraction is the
-correct one. We argue that a real application, by being honest about its
-walls, enumerates the abstractions the agent stack lacks.
+We are explicit throughout about what we are \emph{not} claiming
+(§\ref{sec:notclaiming}): no new operating system, no claim that any
+particular abstraction is the correct one---only that a real application,
+by stating its walls, enumerates abstractions the agent stack lacks.
 
 \section{The workspace}
 
@@ -211,6 +211,7 @@ for are the same ones the OS community is beginning to build. Consumer-side
 evidence corroborates the producer-side agenda.
 
 \section{What we are not claiming}
+\label{sec:notclaiming}
 
 We do not claim a new operating system. We do not claim that the
 abstractions named in Table~\ref{tab:map} are the \emph{correct} ones, only
@@ -232,6 +233,7 @@ producer-side primitives the community is beginning to propose, and that
 the contract between agent applications and their runtime becomes
 something the application requests rather than re-implements.
 
+{\footnotesize
 \begin{thebibliography}{9}
 
 \bibitem{agenticos}
@@ -263,6 +265,7 @@ Y.~Wang, M.~Li, H.~Chen. \emph{Rethinking OS Interfaces for LLM Agents.}
 AgenticOS @ ASPLOS 2026.
 
 \end{thebibliography}
+}
 
 \balance
 \end{document}

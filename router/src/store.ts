@@ -35,3 +35,9 @@ export function saveMessage(
 export function listMessages(channel: string): readonly ChatMessage[] {
   return listStmt.all(channel) as unknown as ChatMessage[];
 }
+
+const deleteAllStmt = db.prepare("DELETE FROM messages");
+
+export function clearMessages(): void {
+  deleteAllStmt.run();
+}

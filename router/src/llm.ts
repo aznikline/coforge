@@ -5,7 +5,17 @@ export interface ChatTurn {
   readonly content: string;
 }
 
-export async function callLLM(messages: readonly ChatTurn[]): Promise<string> {
+export interface LLMUsage {
+  readonly promptTokens: number;
+  readonly completionTokens: number;
+}
+
+export interface LLMResult {
+  readonly reply: string;
+  readonly usage: LLMUsage;
+}
+
+export async function callLLM(messages: readonly ChatTurn[]): Promise<LLMResult> {
   const res = await fetch(`${config.llmBaseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -26,10 +36,17 @@ export async function callLLM(messages: readonly ChatTurn[]): Promise<string> {
 
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   const reply = data.choices?.[0]?.message?.content;
   if (!reply) {
     throw new Error("LLM returned no content");
   }
-  return reply.trim();
+  return {
+    reply: reply.trim(),
+    usage: {
+      promptTokens: data.usage?.prompt_tokens ?? 0,
+      completionTokens: data.usage?.completion_tokens ?? 0,
+    },
+  };
 }

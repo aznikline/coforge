@@ -2,7 +2,13 @@ import Fastify from "fastify";
 import { config } from "./config.js";
 import { loadRegistry, parseMention, talkToAgent } from "./agents.js";
 import { enqueue } from "./queue.js";
-import { saveMessage, listMessages } from "./store.js";
+import { saveMessage, listMessages, clearMessages } from "./store.js";
+import { clearMemory } from "./memory.js";
+
+function clearAll(): void {
+  clearMessages();
+  clearMemory();
+}
 
 const registry = loadRegistry(config.agentsFile);
 
@@ -15,6 +21,14 @@ await app.register(import("@fastify/cors"), {
 app.get("/api/messages/:channel", async (req) => {
   const { channel } = req.params as { channel: string };
   return { messages: listMessages(channel) };
+});
+
+// Test-infrastructure endpoint: clears all agent memory and channel history.
+// Used by the harness to get a clean baseline before probing. Not a user
+// feature — do not expose in the UI.
+app.post("/api/reset", async () => {
+  clearAll();
+  return { ok: true };
 });
 
 app.post("/api/chat", async (req, reply) => {
@@ -35,9 +49,16 @@ app.post("/api/chat", async (req, reply) => {
   }
 
   const agent = registry.get(parsed.agentName)!;
-  const replyText = await enqueue(channel, () => talkToAgent(agent, parsed.body));
-  const agentMsg = saveMessage(channel, agent.name, replyText);
-  return { user: userMsg, reply: agentMsg };
+  const result = await enqueue(channel, () => talkToAgent(agent, parsed.body));
+  const agentMsg = saveMessage(channel, agent.name, result.reply);
+  return {
+    user: userMsg,
+    reply: agentMsg,
+    usage: {
+      promptTokens: result.usage.promptTokens,
+      completionTokens: result.usage.completionTokens,
+    },
+  };
 });
 
 try {

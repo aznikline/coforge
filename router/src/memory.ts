@@ -1,6 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.js";
 
+// Non-goal: memory compression / managed state. loadMemory replays the FULL
+// history into the prompt every turn — no summarization, no archival layer.
+// Deliberately best-effort, not a TODO: it is a measured wall (prompt tokens
+// grow linearly with history). See docs/18 §4 and paper §3.2. The fix is a
+// memory object the runtime manages, not a better prompt here.
+
 const db = new DatabaseSync(config.dbPath);
 db.exec(`
   CREATE TABLE IF NOT EXISTS agent_memory (
@@ -33,4 +39,10 @@ export function loadMemory(agent: string): readonly MemoryTurn[] {
     const row = r as { role: string; content: string };
     return { role: row.role as "user" | "assistant", content: row.content };
   });
+}
+
+const deleteAllMemStmt = db.prepare("DELETE FROM agent_memory");
+
+export function clearMemory(): void {
+  deleteAllMemStmt.run();
 }

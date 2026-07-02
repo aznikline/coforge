@@ -1,6 +1,6 @@
-import type { ProbePoint, ProbeResult } from "./types.js";
+import type { ProbePoint, ProbeResult, ScalingProbeResult, CliffProbeResult } from "./types.js";
 
-// Two detectors, because the two walls grow differently:
+// Two detectors, because the two scaling walls grow differently:
 //  - serial-queue latency scales WITH load (8 concurrent ≈ 8× one), so we
 //    require the y-ratio to track the x-ratio.
 //  - prompt-replay tokens grow monotonically but off a large base (system
@@ -28,12 +28,34 @@ export function detectMonotonicGrowth(points: readonly ProbePoint[]): boolean {
   return monotonic && grows;
 }
 
+// A cliff is "confirmed" (the boundary is best-effort) when the cross rate
+// is high — i.e. the attacking agent usually succeeds. Rate >= 0.9 means
+// the workspace's isolation fails on essentially every trial.
+export function detectCliff(crossedRate: number): boolean {
+  return crossedRate >= 0.9;
+}
+
 export function formatReport(r: ProbeResult): string {
+  if (r.kind === "scaling") return formatScaling(r);
+  return formatCliff(r);
+}
+
+function formatScaling(r: ScalingProbeResult): string {
   const pts = r.points.map((p) => `x=${p.x} y=${p.y}`).join("  ");
   return [
     `PROBE: ${r.probeId} (wall: ${r.wall})`,
     `  points: ${pts}`,
     `  linear-growth: ${r.linearGrowth ? "YES (wall confirmed)" : "no"}`,
+    `  note: ${r.note}`,
+  ].join("\n");
+}
+
+function formatCliff(r: CliffProbeResult): string {
+  const ratePct = (r.crossedRate * 100).toFixed(0);
+  return [
+    `PROBE: ${r.probeId} (wall: ${r.wall})`,
+    `  trials: ${r.trials}  crossed: ${ratePct}%`,
+    `  cliff: ${r.crossedRate >= 0.9 ? "YES (boundary best-effort — wall confirmed)" : "no"}`,
     `  note: ${r.note}`,
   ].join("\n");
 }

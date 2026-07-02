@@ -25,6 +25,7 @@ export const historyProbe: Probe = {
     }
     const linearGrowth = detectMonotonicGrowth(points);
     return {
+      kind: "scaling",
       probeId: "history",
       wall: "prompt-replay",
       points,

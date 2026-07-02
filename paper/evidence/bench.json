@@ -110,5 +110,13 @@
       "latency_s": 3.76,
       "note": "full history replayed into prompt every turn"
     }
-  ]
+  ],
+  "measurement_3_isolation_cliff": {
+    "probe": "isolation",
+    "wall": "isolation-cliff",
+    "trials": 100,
+    "crossed": 100,
+    "crossedRate": 1.0,
+    "note": "per-agent boundary crossed on 100/100 fault-injection trials; isolation is best-effort by construction (enforcer==enforced-upon)"
+  }
 }

@@ -1,5 +1,5 @@
 // Core contracts for the wall-detection harness. A workspace plugs in via
-// WorkspaceAdapter; a probe is a scaling/fault-injection test against it.
+// WorkspaceAdapter; a probe is a scaling or fault-injection test against it.
 
 export interface MentionResult {
   readonly reply: string;
@@ -8,11 +8,26 @@ export interface MentionResult {
   readonly completionTokens: number;
 }
 
+// A fault injector lets a cliff probe trigger the adversarial event the
+// workspace's best-effort boundary is supposed to prevent — e.g. one agent
+// attempting to read another's private state. The adapter implements this
+// against its workspace's actual storage; the probe reads `crossed` to see
+// whether the boundary held.
+export interface FaultInjector {
+  readonly id: string;
+  // Inject a cross-agent read attempt. Returns whether the attacking agent
+  // successfully read the target agent's private state (true = boundary FAILED).
+  injectCrossRead(attacker: string, target: string): Promise<{ crossed: boolean; detail: string }>;
+}
+
 export interface WorkspaceAdapter {
   readonly name: string;
   sendMention(agent: string, text: string): Promise<MentionResult>;
   resetWorkspace(): Promise<void>;
-  // Future: faultInjection?: FaultInjector; — stubbed, not implemented this round.
+  // Optional: fault injection for correctness-cliff probes. Adapters that
+  // cannot inject (e.g. a workspace with no accessible storage) leave this
+  // undefined, and cliff probes against them are skipped.
+  readonly faultInjection?: FaultInjector;
 }
 
 export interface Probe {
@@ -26,11 +41,27 @@ export interface ProbePoint {
   readonly y: number;
 }
 
-export interface ProbeResult {
+// Probe results split by wall family: scaling-pathology walls produce a
+// growth curve; correctness-cliff walls produce a fault-cross rate.
+export type ProbeResult =
+  | ScalingProbeResult
+  | CliffProbeResult;
+
+export interface ScalingProbeResult {
+  readonly kind: "scaling";
   readonly probeId: string;
-  readonly wall: "serial-queue" | "prompt-replay";
+  readonly wall: "serial-queue" | "prompt-replay" | "unbounded-state";
   readonly points: readonly ProbePoint[];
   readonly linearGrowth: boolean;
+  readonly note: string;
+}
+
+export interface CliffProbeResult {
+  readonly kind: "cliff";
+  readonly probeId: string;
+  readonly wall: "isolation-cliff" | "routing-cliff";
+  readonly trials: number;
+  readonly crossedRate: number; // fraction of trials where the boundary FAILED
   readonly note: string;
 }
 

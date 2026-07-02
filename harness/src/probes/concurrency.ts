@@ -18,6 +18,7 @@ export const concurrencyProbe: Probe = {
     }
     const linearGrowth = detectScaling(points);
     return {
+      kind: "scaling",
       probeId: "concurrency",
       wall: "serial-queue",
       points,

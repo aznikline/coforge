@@ -41,7 +41,7 @@ built on operating-system abstractions designed for static workloads. We
 built and ran such a workspace---an open-source, multi-agent chat
 application with persistent per-agent memory---and report where its
 implementation hit walls that are missing OS abstractions. We enumerate
-six workarounds, measure two, and map
+six workarounds, measure three (two scaling, one correctness cliff), and map
 each onto an OS abstraction that would remove it. The contribution is
 consumer-side evidence, not a new OS, for the set of abstractions the
 agent era is starved for.
@@ -74,10 +74,11 @@ operating-system abstraction that should plausibly exist.
 This is a position paper, not a new system: the contribution is the mapping.
 Each of the workspace's admitted workarounds corresponds to an OS-level
 abstraction that would dissolve it.
-We measure two of these workarounds to show they are not cosmetic: a serial
-execution queue whose latency grows linearly with concurrency, and a
+We measure three of these workarounds to show they are not cosmetic: a
+serial execution queue whose latency grows linearly with concurrency, a
 prompt-replay memory scheme whose input-token cost grows linearly with
-history length. Each is technically re-implementable in user space, but
+history length, and an isolation boundary that fails on 100 of 100
+fault-injection trials. Each is technically re-implementable in user space, but
 only by re-building, per application, the scheduling and managed-state
 primitives that belong one layer down---and by getting their corner cases
 right every time.
@@ -123,9 +124,12 @@ operating-system abstraction is conspicuously absent.
 \section{Workarounds and the abstractions they want}
 
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
-implies. Two are measured below: single runs on a developer laptop against
-one OpenAI-compatible model (glm-5.1), reproducible from the artifact
-(anonymized for review).
+implies. They split into two scaling-pathology walls (growth curves) and
+four correctness-cliff walls (invisible until the first adversarial event).
+We measure the two scaling walls and one cliff below; the remaining three
+cliffs are argued structurally in \S\ref{sec:abstractions}. Single runs on
+a developer laptop, one OpenAI-compatible model (glm-5.1), reproducible
+from the artifact (anonymized for review).
 
 \begin{table}[t]
 \caption{Each workaround maps to an OS abstraction that would remove it.}
@@ -154,11 +158,10 @@ $N \in \{1,2,4,8\}$ and measured end-to-end latency. Wall-clock time grew
 linearly: 3.3\,s, 7.0\,s, 13.9\,s, 27.3\,s for $N=1,2,4,8$---the eighth
 request waited over 27 seconds for seven predecessors. This is not a slow
 model; it is a \emph{degenerate scheduler} that imposes a global order the
-application has no basis to choose. An OS that accounted for agents as
-first-class schedulable entities---with their intent, priority, and
-exploration semantics---could reorder, batch, or interleave these requests.
-The application can only fall back to a queue because no such abstraction
-exists beneath it.
+application has no basis to choose. An OS that treated agents as
+first-class schedulable entities could reorder, batch, or interleave these
+requests; the application cannot, because no such abstraction exists
+beneath it.
 
 \subsection{Measured: prompt-replay memory}
 
@@ -170,11 +173,22 @@ token count per turn. Prompt tokens grew
 so each turn re-pays for every prior turn. An agent that persists across
 days or weeks, as the AgenticOS position assumes, becomes costly under
 this scheme well before it becomes unusable. The fix is not a better
-application prompt; it is a memory object the runtime manages: episodic
-storage with compression, recall, and eviction policies that the
-application requests rather than implements.
+application prompt; it is a memory object the runtime manages with
+compression, recall, and eviction the application requests, not implements.
+
+\subsection{Measured: the isolation cliff}
+\label{sec:isolation}
+
+Isolation has no growth curve---it is a cliff, invisible until the first
+adversarial event. We surface it with a fault-injection rate. One agent
+stored a secret; over $N=100$ trials the application's own code path (a
+buggy or subverted agent, a misconfigured tool) attempted to read that
+agent's private memory via the shared SQLite handle. The per-agent boundary
+was crossed on 100 of 100 trials: the application that drew the boundary is
+the application that can cross it (\S\ref{sec:abstractions}).
 
 \section{Why these are abstractions, not features}
+\label{sec:abstractions}
 
 A reviewer may object that the items in Table~\ref{tab:map} are missing
 \emph{features}, not missing \emph{abstractions}. The distinction is the
@@ -185,18 +199,14 @@ feature lives inside one program's logic and can be made correct there; an
 abstraction is a contract that must be guaranteed by the layer beneath, or
 not at all.
 
-Isolation is the clearest case. An application can ask agents not to read
-each other's state, but any boundary it draws is advisory: a bug, a
-misconfigured tool call, or a prompt-injected agent can step over it, and
-the application has no vantage point from which to detect the crossing.
-Only the runtime, which mediates every memory access, can enforce a
-boundary that holds against a hostile or buggy agent. The same structure
-repeats across the rows: concurrency safety cannot be verified by a program
-that is itself one of the concurrent parties; durable, compressible context
-cannot be managed correctly by the process whose own state is being
-compressed; capability routing cannot be trusted when the router runs
-inside the routed process. In each case the application is both the enforcer
-and the enforced-upon, so its enforcement is best-effort by construction.
+Isolation is the clearest case (\S\ref{sec:isolation} measures it): any
+boundary an application draws is advisory---a bug, a misconfigured tool, or
+a prompt-injected agent steps over it, and the application has no vantage
+point to detect the crossing. Only the runtime, mediating every memory
+access, can enforce one that holds. The same structure---enforcer and
+enforced-upon are the same program---repeats across the other rows:
+concurrency safety, context compression, capability routing each cannot be
+verified by the process whose own behavior it constrains.
 
 This is also why the walls are not specific to our workspace. Any
 application that lets agents persist, collaborate, or be selected by
@@ -208,16 +218,16 @@ these, badly, is the evidence.
 
 \section{Relation to the AgenticOS agenda}
 
-The mapping aligns with topics the AgenticOS community has already
-identified from the producer side. Agent-aware resource
-control~\cite{agentcgroup} corresponds to our scheduling row; long-lived
-state abstractions for agent context and memory~\cite{agenticos} correspond
-to our replay row; execute-only and attested-channel
-isolation~\cite{execonly,grimlock} corresponds to our isolation row;
-skills as a composition unit~\cite{skillos} corresponds to our persona row;
-agent-facing interface redesign~\cite{rethos} corresponds to our routing
-row. The agreement is the point: the abstractions an application is starved
-for are the same ones the OS community is beginning to build.
+Each row aligns with a topic the AgenticOS community has identified from the
+producer side: agent-aware resource control~\cite{agentcgroup},
+long-lived state for agent memory~\cite{agenticos}, execute-only and
+attested-channel isolation~\cite{execonly,grimlock}, skills as composition
+unit~\cite{skillos}, agent-facing interface redesign~\cite{rethos}. But the
+1st-edition agenda is weighted roughly ten-to-two toward performance over
+security: the two scaling walls we measure sit on the well-served side, while
+the four correctness cliffs---including the isolation wall measured
+above---occupy the under-served ground. The asymmetry in our evidence is thus
+the same asymmetry the field carries.
 
 \section{What we are not claiming}
 \label{sec:notclaiming}
@@ -230,19 +240,20 @@ with its shape---persistent, multi-agent, capability-routed---will hit the
 same walls because the walls are in the runtime contract. We do not claim
 these abstractions are easy; we claim their absence is expensive, and we
 have the measurements to show it. The measurements are limited: single-run,
-one model, one agent, eight turns---no seeds, CIs, or hardware sweep. They
-show the growth \emph{shape} of two walls, not their magnitude.
+one model, small N, no seeds or CIs. They show growth \emph{shape} (two
+scaling walls) and a cross-\emph{rate} (one cliff), not magnitudes.
+
+\enlargethispage{\baselineskip}
 
 \section{Conclusion}
 
 An application-layer agent workspace that states its non-goals explicitly is
 a measuring instrument for the abstractions its operating system lacks. We
-built one, measured two of its walls, and mapped six to OS-level
-abstractions the agent era needs.
-The hope is that consumer-side evidence of this kind complements the
-producer-side primitives the community is beginning to propose, and that
-the contract between agent applications and their runtime becomes
-something the application requests rather than re-implements.
+built one, measured three of its walls (two scaling, one cliff), and mapped
+six to OS-level abstractions the agent era needs. Consumer-side evidence of
+this kind complements the producer-side primitives the community is
+beginning to propose, toward a contract agent applications request rather
+than re-implement.
 
 {\footnotesize
 \begin{thebibliography}{9}
@@ -253,12 +264,12 @@ SOSP 2026 (2nd edition); ASPLOS 2026 (1st edition).
 \url{https://os-for-agent.github.io/}
 
 \bibitem{agentcgroup}
-Y.~Zheng, J.~Fan, Q.~Fu, Y.~Yang, W.~Zhang, A.~Quinn.
+Y.~Zheng, J.~Fan, Q.~Fu, et~al.
 \emph{AgentCgroup: Understanding and Controlling OS Resources of AI
 Agents.} AgenticOS 2026.
 
 \bibitem{skillos}
-L.~Chen, Z.~Wang, W.~Zheng, E.~Feng, D.~Du, Y.~Xia, H.~Chen.
+L.~Chen, Z.~Wang, W.~Zheng, et~al.
 \emph{Skills are the new Apps---Now It Is Time for Skill OS.}
 AgenticOS 2026.
 
@@ -271,7 +282,7 @@ Q.~Wu, W.~Zhang, G.~Fang, et~al. \emph{Grimlock: Guarding High-Agency Systems
 with eBPF and Attested Channels.} AgenticOS 2026.
 
 \bibitem{rethos}
-Y.~Wang, M.~Li, H.~Chen. \emph{Rethinking OS Interfaces for LLM Agents.}
+Y.~Wang et~al. \emph{Rethinking OS Interfaces for LLM Agents.}
 AgenticOS 2026.
 
 \end{thebibliography}

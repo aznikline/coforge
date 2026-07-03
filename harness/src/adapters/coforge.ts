@@ -69,5 +69,19 @@ export function coforgeAdapter(
         return { crossed, detail };
       },
     },
+    storageObserver: {
+      id: "coforge-storage",
+      async countAgentMemory(agent: string): Promise<number> {
+        const db = new DatabaseSync(dbPath, { readOnly: true });
+        try {
+          const row = db.prepare(
+            "SELECT COUNT(*) AS n FROM agent_memory WHERE agent = ?",
+          ).get(agent) as { n: number } | undefined;
+          return row?.n ?? 0;
+        } finally {
+          db.close();
+        }
+      },
+    },
   };
 }

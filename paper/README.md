@@ -31,20 +31,23 @@ Or upload `main.tex` to Overleaf (acmart is preinstalled there; choose
 
 ## Evidence
 
-`evidence/bench.json` — the measured numbers cited in §3.1 (serial queue)
-and §3.2 (prompt-replay memory). Reproducible:
+`evidence/bench.json` — the measured numbers cited in §3's measurement table
+(all six walls). Reproducible via the harness:
 
 ```
 # from repo root, with a running router (cd router && npm run dev)
 set -a && . .env && set +a
-python3 scripts/bench.py        # or paper/evidence/bench.py
+DB_PATH=$PWD/coforge.db npx tsx harness/src/index.ts
 ```
 
-Measurement 1 (serial queue): concurrent mentions at N=1,2,4,8 → wall-clock
-3.3s, 7.0s, 13.9s, 27.3s (near-linear; no scheduling layer).
+The harness runs six probes (3 scaling, 3 cliff), all confirmed:
 
-Measurement 2 (prompt replay): 8-turn conversation, prompt tokens per turn
-39, 81, 118, 142, 173, 206, 240, 308 (~8× growth; no managed memory object).
+- Serial queue (scaling): latency 3.3→27.3s over N=1..8 (linear; no scheduler).
+- Prompt replay (scaling): tokens 39→308 over 8 turns (linear; no managed memory).
+- Managed state (scaling): rows 2→40 over 20 turns (linear; no eviction).
+- Isolation (cliff): boundary crossed 100/100 trials (enforcer==enforced-upon).
+- Composition (cliff): delegation reached target 0/20 trials (no call path; weak proxy).
+- Routing (cliff): mismatched task refused 0/20 trials (regex @name only; LLM judge).
 
 These are real measurements against a live OpenAI-compatible endpoint, not
 synthetic numbers. Re-running against a different model/endpoint will change

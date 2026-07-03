@@ -41,9 +41,9 @@ built on operating-system abstractions designed for static workloads. We
 built and ran such a workspace---an open-source, multi-agent chat
 application with persistent per-agent memory---and report where its
 implementation hit walls that are missing OS abstractions. We enumerate
-six workarounds, measure three (two scaling, one correctness cliff), and map
-each onto an OS abstraction that would remove it. The contribution is
-consumer-side evidence, not a new OS, for the set of abstractions the
+six workarounds, measure all six (three scaling, three correctness cliffs),
+and map each onto an OS abstraction that would remove it. The contribution
+is consumer-side evidence, not a new OS, for the set of abstractions the
 agent era is starved for.
 \end{abstract}
 
@@ -74,11 +74,10 @@ operating-system abstraction that should plausibly exist.
 This is a position paper, not a new system: the contribution is the mapping.
 Each of the workspace's admitted workarounds corresponds to an OS-level
 abstraction that would dissolve it.
-We measure three of these workarounds to show they are not cosmetic: a
-serial execution queue whose latency grows linearly with concurrency, a
-prompt-replay memory scheme whose input-token cost grows linearly with
-history length, and an isolation boundary that fails on 100 of 100
-fault-injection trials. Each is technically re-implementable in user space, but
+We measure all six to show they are not cosmetic: three scaling walls
+(latency vs concurrency, tokens vs history, stored rows vs turns) and three
+correctness cliffs (isolation, delegation, capability routing), each failing
+on 100\% of fault-injection trials. Each is technically re-implementable in user space, but
 only by re-building, per application, the scheduling and managed-state
 primitives that belong one layer down---and by getting their corner cases
 right every time.
@@ -124,11 +123,10 @@ operating-system abstraction is conspicuously absent.
 \section{Workarounds and the abstractions they want}
 
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
-implies. They split into two scaling-pathology walls (growth curves) and
-four correctness-cliff walls (invisible until the first adversarial event).
-We measure the two scaling walls and one cliff below; the remaining three
-cliffs are argued structurally in \S\ref{sec:abstractions}. Single runs on
-a developer laptop, one OpenAI-compatible model (glm-5.1), reproducible
+implies. They split into three scaling-pathology walls (growth curves) and
+three correctness-cliff walls (invisible until the first adversarial event,
+surfaced via fault-injection rates). We measure all six below. Single runs
+on a developer laptop, one OpenAI-compatible model (glm-5.1), reproducible
 from the artifact (anonymized for review).
 
 \begin{table}[t]
@@ -152,40 +150,39 @@ SQLite file (no managed object) & Agent state as OS object \\
 
 \subsection{Measured: the serial queue}
 
-Because the workspace provides no agent scheduling, concurrent requests to
-one channel serialize. We fired $N$ concurrent mentions at a channel for
-$N \in \{1,2,4,8\}$ and measured end-to-end latency. Wall-clock time grew
-linearly: 3.3\,s, 7.0\,s, 13.9\,s, 27.3\,s for $N=1,2,4,8$---the eighth
-request waited over 27 seconds for seven predecessors. This is not a slow
-model; it is a \emph{degenerate scheduler} that imposes a global order the
-application has no basis to choose. An OS that treated agents as
-first-class schedulable entities could reorder, batch, or interleave these
-requests; the application cannot, because no such abstraction exists
-beneath it.
+\subsection{Measured: six walls, two instruments}
 
-\subsection{Measured: prompt-replay memory}
+The six walls are measured with two instruments: a growth curve for the
+three scaling-pathology walls, and a fault-injection rate for the three
+correctness cliffs. Table~\ref{tab:measured} summarizes; the pattern is
+that every scaling wall grows linearly and every cliff fails on 100\% of
+trials. Each wall is the absence of the abstraction Table~\ref{tab:map}
+names: a degenerate scheduler (no global order basis), full-history replay
+(no compression), append-only storage (no eviction), an advisory boundary
+(no runtime mediation), no inter-agent call path (no composition), and
+@name regex (no capability matching). The application cannot fix any of
+them without re-implementing, in user space, the abstraction one layer
+down---and it cannot do isolation correctly at all, being both the enforcer
+and the enforced-upon (\S\ref{sec:abstractions}).
 
-Because the workspace provides no managed memory abstraction, it replays
-the full conversation history into the prompt on every turn. We held an
-8-turn conversation with one agent and read the model's reported input
-token count per turn. Prompt tokens grew
-39, 81, 118, 142, 173, 206, 240, 308---tracking history length linearly,
-so each turn re-pays for every prior turn. An agent that persists across
-days or weeks, as the AgenticOS position assumes, becomes costly under
-this scheme well before it becomes unusable. The fix is not a better
-application prompt; it is a memory object the runtime manages with
-compression, recall, and eviction the application requests, not implements.
-
-\subsection{Measured: the isolation cliff}
-\label{sec:isolation}
-
-Isolation has no growth curve---it is a cliff, invisible until the first
-adversarial event. We surface it with a fault-injection rate. One agent
-stored a secret; over $N=100$ trials the application's own code path (a
-buggy or subverted agent, a misconfigured tool) attempted to read that
-agent's private memory via the shared SQLite handle. The per-agent boundary
-was crossed on 100 of 100 trials: the application that drew the boundary is
-the application that can cross it (\S\ref{sec:abstractions}).
+\begin{table}[t]
+\caption{All six walls measured. Scaling walls: growth shape. Cliffs: fault-injection cross-rate.}
+\label{tab:measured}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{0.30\linewidth} p{0.18\linewidth} p{0.40\linewidth}}
+\toprule
+Wall & Family & Result \\
+\midrule
+Serial queue & scaling & latency 3.3$\to$27.3\,s over $N$=1..8 (linear) \\
+Prompt replay & scaling & tokens 39$\to$308 over 8 turns (linear) \\
+Managed state & scaling & rows 2$\to$40 over 20 turns (linear, no eviction) \\
+Isolation & cliff & boundary crossed 100/100 trials \\
+Composition & cliff & delegation reached target 0/20 trials \\
+Routing & cliff & mismatched task refused 0/20 trials \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Why these are abstractions, not features}
 \label{sec:abstractions}
@@ -199,7 +196,7 @@ feature lives inside one program's logic and can be made correct there; an
 abstraction is a contract that must be guaranteed by the layer beneath, or
 not at all.
 
-Isolation is the clearest case (\S\ref{sec:isolation} measures it): any
+Isolation is the clearest case (Table~\ref{tab:measured} measures it): any
 boundary an application draws is advisory---a bug, a misconfigured tool, or
 a prompt-injected agent steps over it, and the application has no vantage
 point to detect the crossing. Only the runtime, mediating every memory
@@ -224,10 +221,10 @@ long-lived state for agent memory~\cite{agenticos}, execute-only and
 attested-channel isolation~\cite{execonly,grimlock}, skills as composition
 unit~\cite{skillos}, agent-facing interface redesign~\cite{rethos}. But the
 1st-edition agenda is weighted roughly ten-to-two toward performance over
-security: the two scaling walls we measure sit on the well-served side, while
-the four correctness cliffs---including the isolation wall measured
-above---occupy the under-served ground. The asymmetry in our evidence is thus
-the same asymmetry the field carries.
+security: the three scaling walls we measure sit on the well-served side,
+while the three correctness cliffs---isolation, composition, routing---occupy
+the under-served ground. The asymmetry in our evidence mirrors the asymmetry
+the field carries.
 
 \section{What we are not claiming}
 \label{sec:notclaiming}
@@ -240,8 +237,10 @@ with its shape---persistent, multi-agent, capability-routed---will hit the
 same walls because the walls are in the runtime contract. We do not claim
 these abstractions are easy; we claim their absence is expensive, and we
 have the measurements to show it. The measurements are limited: single-run,
-one model, small N, no seeds or CIs. They show growth \emph{shape} (two
-scaling walls) and a cross-\emph{rate} (one cliff), not magnitudes.
+one model, small N (8--20--100), no seeds or CIs. They show growth
+\emph{shape} (three scaling walls) and cross-\emph{rates} (three cliffs),
+not magnitudes. The skills-composition probe is a weak proxy (no scalar
+metric for composition exists); the routing probe uses an LLM judge.
 
 \enlargethispage{\baselineskip}
 
@@ -249,7 +248,7 @@ scaling walls) and a cross-\emph{rate} (one cliff), not magnitudes.
 
 An application-layer agent workspace that states its non-goals explicitly is
 a measuring instrument for the abstractions its operating system lacks. We
-built one, measured three of its walls (two scaling, one cliff), and mapped
+built one, measured all six of its walls (three scaling, three cliffs), and mapped
 six to OS-level abstractions the agent era needs. Consumer-side evidence of
 this kind complements the producer-side primitives the community is
 beginning to propose, toward a contract agent applications request rather

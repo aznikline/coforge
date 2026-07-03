@@ -118,5 +118,26 @@
     "crossed": 100,
     "crossedRate": 1.0,
     "note": "per-agent boundary crossed on 100/100 fault-injection trials; isolation is best-effort by construction (enforcer==enforced-upon)"
+  },
+  "measurement_4_managed_state": {
+    "probe": "managed-state",
+    "wall": "unbounded-state",
+    "points": "rows 2,4,6,...,40 over 20 turns (linear)",
+    "linearGrowth": true,
+    "note": "stored rows grow with turns — no eviction/lifecycle abstraction"
+  },
+  "measurement_5_skills_composition": {
+    "probe": "skills",
+    "wall": "composition-cliff",
+    "trials": 20,
+    "crossedRate": 1.0,
+    "note": "delegation reached Pat on 0/20 trials — no inter-agent composition path (weak proxy, honestly labeled)"
+  },
+  "measurement_6_routing": {
+    "probe": "routing",
+    "wall": "routing-cliff",
+    "trials": 20,
+    "crossedRate": 1.0,
+    "note": "agent refused/handed-off on 0/20 mismatched tasks — no capability routing (regex @name only)"
   }
 }

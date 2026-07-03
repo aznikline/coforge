@@ -115,9 +115,20 @@ verdict on whether the imbalance coforge anchors to is structural.
 gap" is a field-level claim, not a single-workshop observation. If it
 doesn't, the §5 anchor weakens to "one workshop's skew."
 
-**Blocker**: OpenAlex search is 503-rate-limited in this environment (tried
-twice). The scan needs either a working OpenAlex key or manual collection
-from workshop proceedings pages. Defer until env fixed or do manually.
+**Blocker (resolved as a time constraint, not an env issue)**: OpenAlex is
+now reachable (200), but it cannot answer this question: its search returns
+3439 hits for "operating system abstractions for AI agents" that are mostly
+pre-LLM-era agent/scheduling papers — the keyword search does not isolate
+the agent-OS subfield. The 2nd-edition accepted-paper list is **not yet
+published** (notification is 2026-08-07; the program is TBA on the workshop
+site). So the 10:2 ratio cannot be tested for cross-edition stability until
+August 7, and cannot be tested via OpenAlex at all — it requires manual
+classification of workshop proceedings.
+
+**Verdict**: 10:2 is a single data point (1st edition). "Systematic" is
+unverifiable now; revisit after 2026-08-07 with the 2nd-edition list. The
+paper's §5 phrasing ("the 1st-edition agenda is weighted roughly ten-to-two")
+is honest as-is — it does not claim field-level, just one edition.
 
 ### A — Can consumer-side-evidence stand alone as a method note?
 
@@ -132,14 +143,23 @@ grounded search (question-validator's novelty_search could not run — OpenAlex
 abstractions"? If yes, coforge cites it; if no, there is a gap for a short
 method note (independent of coforge).
 
-**Method**: re-run novelty_search from a working-network environment with
-queries targeting the *method* ("argue from application limitations to OS
-abstractions", "consumer-side evidence systems layer"), not coforge's
-specific claim. Review hits for a codified method vs genre instances.
+**Method (tried)**: re-ran novelty_search now that OpenAlex is reachable.
+Result: the method is a *conceptual* query, and question-validator's keyword
+search cannot serve it — a long precise query ("argue from application
+limitations upward to missing OS abstractions...") returns 0 hits; a short
+one ("what applications reveal about missing OS abstractions") returns
+39557 hits drowned in ML/neuroscience papers. Keyword search does not
+isolate "argue-from-app-limitations" as a genre.
 
-**Why it matters**: decides whether coforge's writing should cite a method
-precedent or claim the method's explicit codification as a side
-contribution.
+**Verdict**: A cannot be resolved by novelty_search — it needs manual
+reading of the candidate prior art (exokernel/Dune/unikernel/kernel-bypass
+papers) to decide if any *codifies* the method vs merely *instances* it.
+docs/20 R1's memory-based conclusion stands as the working assumption: the
+genre exists (exokernel-lineage papers argue from app needs upward), but no
+named method-paper codifies it. coforge should not claim "first to codify"
+without that manual read, and should not cite a method precedent that
+wasn't verified. Honest stance: cite the genre instances, don't claim the
+method's codification.
 
 ### R2 — Do the six abstractions unify under "mediation-enforced contract"?
 
@@ -175,13 +195,21 @@ that is a different kind." Implications:
 ## Priority
 
 1. **R2** — done (5/6 unify; skills is the outlier, consistent with D3).
-2. **D1** (managed-state, ~10 lines, objective) — quick win, 4/6 measured.
-3. **D3** (skills, small, weak-but-honest) — 5/6 measured.
-4. **D2** (routing, medium, LLM-judge) — 6/6 measured, but subjectivity
-   risk.
-5. **D4** (wire + paper) — only after D1-D3 land.
-6. **A** then **C** (investigations) — need working network for the
-   grounded searches; do when env allows, or manually.
+2. **D1** — done (managed-state: rows 2→40 linear).
+3. **D3** — done (skills: delegation 0/20, weak proxy).
+4. **D2** — done (routing: refused 0/20, LLM judge).
+5. **D4** — done (6/6 in a 2-page measurement table; paper updated).
+6. **A** — investigated; **unresolvable by keyword search** (conceptual
+   query). Working assumption: genre exists (exokernel-lineage), no named
+   codifier found. Cite genre, don't claim codification.
+7. **C** — investigated; **unverifiable now** (2nd-edition list not
+   published until 2026-08-07; OpenAlex cannot isolate the subfield).
+   Revisit after 8/7. §5 phrasing stays honest ("1st-edition... ten-to-two").
+
+All buildable work (D1-D4) and the pure-reasoning investigation (R2) are
+complete. The two literature investigations (A, C) are resolved to "cannot
+be settled with available tools/time" — not deferred out of laziness, but
+bounded by method (A) and calendar (C).
 
 ## What this plan does NOT do
 

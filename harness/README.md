@@ -1,60 +1,81 @@
-# coforge harness — wall detector
+# coforge-harness — agent-workspace wall detector
 
-A measurement tool that, given an agent-workspace adapter, reports where the
-workspace scales linearly (scaling-pathology walls) and exposes a
-fault-injection hook for correctness cliffs (interface only, not implemented
-this round).
+A CLI tool that runs six probes against an agent workspace and reports which
+walls it hits: three scaling-pathology walls (growth curves) and three
+correctness cliffs (fault-injection rates). Plug any workspace in via the
+adapter contract; the harness flags the same walls regardless of
+implementation.
 
 This is docs/19's nominated **durable artifact**: useful to the OS community
 (consumer-side evidence) and to any agent-app builder (their own diagnosis),
 and it does not compete with OS-layer work because it measures the *gap*,
 not fills it.
 
-## Run
-
-Start coforge-router in one terminal:
+## Quick start
 
 ```
-cd ../router && npm run dev
+cd harness && npm install
+
+# mock workspace — pure local, no LLM/server (good for CI / first run)
+npm run probe:mock
+
+# coforge workspace — needs a running router + LLM key
+cd ../router && npm run dev        # separate terminal
+cd ../harness && set -a && . ../.env && set +a
+npm run probe:coforge
 ```
 
-Run the harness in another:
-
-```
-npm install
-npm run run      # or: npx tsx src/index.ts
-```
-
-Output flags each wall as `linear-growth: YES (wall confirmed)` or `no`,
-with the measured points. The verdict, not the raw numbers, is the point.
-
-## Probes (scaling, this round)
-
-- **concurrency** — fire N=1,2,4,8 concurrent @mentions, report wall-clock
-  vs N. Serial-queue wall → latency scales with N.
-- **history** — hold an 8-turn conversation, report prompt-tokens vs turn.
-  Prompt-replay wall → tokens grow monotonically with history.
-
-Two detectors, because the walls grow differently (see `src/analyze.ts`):
-`detectScaling` (y-ratio tracks x-ratio) for concurrency, `detectMonotonicGrowth`
-(monotonic + meaningful increase) for history.
+Output: one block per probe with a verdict (`wall confirmed` / `no`) and the
+measured numbers. The verdict, not the raw numbers, is the point.
 
 ## Adapters
 
-`src/adapters/coforge.ts` drives coforge-router over HTTP (`/api/chat` for
-mentions, `/api/reset` for a clean baseline). Add another workspace by
-implementing the `WorkspaceAdapter` interface in `src/types.ts` — core and
-probes do not change.
+Two ship; the contract is open for more.
 
-## Out of scope (this round)
+- **mock** (`adapters/mock.ts`) — a pure-local workspace with no LLM. Mirrors
+  coforge's wall structure by construction (serial queue, replay, shared
+  store). Use to verify the harness works without any external deps.
+  Skips the routing probe (needs an LLM judge).
+- **coforge** (`adapters/coforge.ts`) — drives a running coforge-router over
+  HTTP. Uses the router's `/api/chat` (for mentions + token usage), `/api/reset`
+  (clean baseline), and opens the router's SQLite file for fault-injection
+  and storage observation.
 
-- Other adapters — interface only.
-- Correctness-cliff probes (prompt injection, capability mismatch) — the
-  `WorkspaceAdapter` interface leaves a `faultInjection?` hook for later.
-- A web UI — CLI + the per-probe verdict is enough.
+Add a third by implementing `WorkspaceAdapter` in `src/types.ts`:
+`sendMention`, `resetWorkspace`, and optional `faultInjection` +
+`storageObserver`. Core and probes do not change. (A Letta/LangGraph adapter
+is the obvious next step — blocked here on a usable agent-runtime endpoint.)
+
+## Probes (six, two families)
+
+| Probe | Wall | Family | What it measures |
+|-------|------|--------|------------------|
+| concurrency | serial-queue | scaling | latency vs N concurrent mentions |
+| history | prompt-replay | scaling | prompt tokens vs turn count |
+| managed-state | unbounded-state | scaling | stored rows vs turn count |
+| isolation | isolation-cliff | cliff | cross-agent read cross-rate (100 trials) |
+| skills | composition-cliff | cliff | delegation reach rate (20 trials) |
+| routing | routing-cliff | cliff | role-mismatch refuse rate (20 trials, LLM judge) |
+
+Two detectors (`analyze.ts`): `detectScaling`/`detectMonotonicGrowth` for
+curves, `detectCliff` (cross-rate ≥ 0.9) for fault-injection rates.
+
+## Reports
+
+- `reports/coforge-vs-mock.md` — D3 comparison: both workspaces confirm 5/6
+  walls (mock skips routing, no LLM). Proves the harness is generic, not
+  coforge-specific. Also notes the routing probe's LLM-judge instability
+  (coforge's routing result flipped 100%→30% across runs).
+
+## Honest limitations
+
+- The routing probe uses an LLM judge (same model the workspace uses); its
+  verdict is not deterministic. A robust version would majority-vote N passes.
+- The skills probe is a weak proxy (no scalar metric for composition exists).
+- mock is author-written; a third-party adapter (Letta/etc.) is the real
+  generality proof, still future work.
 
 ## Relation to the paper
 
-The two probes implement the two measured rows of `paper/main.tex` §3
-(serial queue, prompt-replay). The harness is the generalization of
-`paper/evidence/bench.py` into a reusable tool.
+The six probes implement the measured rows of `paper/main.tex` §3's
+measurement table. `paper/evidence/bench.json` holds the raw numbers.

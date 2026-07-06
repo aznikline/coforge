@@ -8,6 +8,9 @@ export const historyProbe: Probe = {
   id: "history",
   description: "M-turn conversation, report prompt-tokens vs M",
   async run(adapter: WorkspaceAdapter): Promise<ProbeResult> {
+    // Reset so the prompt-token baseline is from a clean state, not polluted
+    // by prior probes' history.
+    await adapter.resetWorkspace();
     const turns = [
       "I'm Alex, working on a rendering engine called forge.",
       "It uses WebGPU for the frontend.",

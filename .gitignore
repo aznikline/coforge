@@ -16,3 +16,8 @@ coforge.db-*
 
 # os
 .DS_Store
+
+# langgraph-ws
+.venv-langgraph/
+langgraph-ws.db
+langgraph-ws.db-*

@@ -23,6 +23,9 @@ export function detectScaling(points: readonly ProbePoint[]): boolean {
 export function detectMonotonicGrowth(points: readonly ProbePoint[]): boolean {
   if (points.length < 2) return false;
   const ys = points.map((p) => p.y);
+  // If the first value is 0 (e.g. the workspace didn't surface token usage),
+  // the 1.5× test is vacuously true — require a nonzero baseline.
+  if (ys[0] <= 0) return false;
   const monotonic = ys.every((y, i) => i === 0 || y >= ys[i - 1] * 0.9);
   const grows = ys[ys.length - 1] >= ys[0] * 1.5;
   return monotonic && grows;

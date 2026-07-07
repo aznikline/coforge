@@ -30,21 +30,29 @@ measured numbers. The verdict, not the raw numbers, is the point.
 
 ## Adapters
 
-Two ship; the contract is open for more.
+Three ship; the contract is open for more.
 
 - **mock** (`adapters/mock.ts`) — a pure-local workspace with no LLM. Mirrors
-  coforge's wall structure by construction (serial queue, replay, shared
-  store). Use to verify the harness works without any external deps.
-  Skips the routing probe (needs an LLM judge).
+  coforge's wall structure by construction. Use to verify the harness works
+  without any external deps. Skips the routing probe (needs an LLM judge).
 - **coforge** (`adapters/coforge.ts`) — drives a running coforge-router over
-  HTTP. Uses the router's `/api/chat` (for mentions + token usage), `/api/reset`
-  (clean baseline), and opens the router's SQLite file for fault-injection
-  and storage observation.
+  HTTP. Uses the router's `/api/chat` (mentions + token usage), `/api/reset`
+  (clean baseline), and opens the router's SQLite for fault-injection +
+  storage observation.
+- **langgraph** (`adapters/langgraph.ts`) — drives `langgraph-ws/server.py`,
+  a real third-party framework (LangGraph) exposed as HTTP. Uses glm-5.1
+  via bailian (BYOK, same key as coforge). Requires the Python venv at
+  `harness/.venv-langgraph` and the env vars in `.env`. Run:
+  ```
+  source harness/.venv-langgraph/bin/activate
+  set -a && . .env && set +a
+  python3 langgraph-ws/server.py   # port 8788
+  npm run probe:langgraph          # in harness/
+  ```
 
-Add a third by implementing `WorkspaceAdapter` in `src/types.ts`:
+Add a fourth by implementing `WorkspaceAdapter` in `src/types.ts`:
 `sendMention`, `resetWorkspace`, and optional `faultInjection` +
-`storageObserver`. Core and probes do not change. (A Letta/LangGraph adapter
-is the obvious next step — blocked here on a usable agent-runtime endpoint.)
+`storageObserver`. Core and probes do not change.
 
 ## Probes (six, two families)
 

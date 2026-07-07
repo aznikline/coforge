@@ -6,6 +6,7 @@
   "scripts": {
     "probe:mock": "tsx src/cli.ts probe --adapter mock",
     "probe:coforge": "tsx src/cli.ts probe --adapter coforge",
+    "probe:langgraph": "tsx src/cli.ts probe --adapter langgraph",
     "probe": "tsx src/cli.ts probe",
     "typecheck": "tsc --noEmit"
   },

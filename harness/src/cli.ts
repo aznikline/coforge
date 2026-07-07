@@ -13,6 +13,7 @@
 
 import { mockAdapter } from "./adapters/mock.js";
 import { coforgeAdapter } from "./adapters/coforge.js";
+import { langgraphAdapter } from "./adapters/langgraph.js";
 import { concurrencyProbe } from "./probes/concurrency.js";
 import { historyProbe } from "./probes/history.js";
 import { managedStateProbe } from "./probes/managed-state.js";
@@ -45,7 +46,11 @@ async function buildAdapter(): Promise<WorkspaceAdapter> {
     const channel = `harness-${Date.now()}`;
     return coforgeAdapter(router, channel, db);
   }
-  throw new Error(`unknown adapter '${which}' (try: mock, coforge)`);
+  if (which === "langgraph") {
+    const ws = arg("ws") ?? process.env.LANGGRAPH_WS_URL ?? "http://localhost:8788";
+    return langgraphAdapter(ws);
+  }
+  throw new Error(`unknown adapter '${which}' (try: mock, coforge, langgraph)`);
 }
 
 async function main(): Promise<void> {

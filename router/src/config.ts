@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
-loadDotenv({ path: join(PROJECT_ROOT, ".env") });
+loadDotenv({ path: join(PROJECT_ROOT, ".env"), override: true });
 
 function required(name: string): string {
   const v = process.env[name];
@@ -22,4 +22,10 @@ export const config = {
   routerPort: Number(process.env.ROUTER_PORT ?? 8787),
   agentsFile: process.env.AGENTS_FILE ?? join(PROJECT_ROOT, "agents.json"),
   dbPath: process.env.DB_PATH ?? join(PROJECT_ROOT, "coforge.db"),
+  // B2 memory compression: on by default (coforge as usable workspace).
+  // Set COMPRESS_MEMORY=false to reproduce the paper's prompt-replay wall.
+  compressMemory: process.env.COMPRESS_MEMORY !== "false",
+  // summarize when history (rows) exceeds N+K; keep the K most recent turns.
+  compressThresholdRows: 20, // N*2 (10 turns)
+  compressKeepRows: 8,       // K*2 (4 turns)
 } as const;

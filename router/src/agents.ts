@@ -1,7 +1,24 @@
 import { readFileSync, existsSync } from "node:fs";
 import type { AgentConfig, AgentRegistry } from "./types.js";
 import { callLLM, type ChatTurn, type LLMResult } from "./llm.js";
-import { appendMemory, loadMemory } from "./memory.js";
+import { appendMemory, loadMemory, summarizeOld, type MemoryTurn, type Summarizer } from "./memory.js";
+import { config } from "./config.js";
+
+// A summarizer that turns old conversation turns into one paragraph, via the
+// same LLM the agent uses. Used by summarizeOld when compression is on.
+const summarizeTurns: Summarizer = async (turns: readonly MemoryTurn[]) => {
+  const transcript = turns
+    .map((t) => {
+      if (t.role === "system") return t.content;
+      return `${t.role === "user" ? "User" : "Agent"}: ${t.content}`;
+    })
+    .join("\n");
+  const result = await callLLM([
+    { role: "system", content: "Summarize the conversation below into a concise paragraph preserving key facts, names, and decisions. Do not add anything not in the conversation." },
+    { role: "user", content: transcript },
+  ]);
+  return result.reply;
+};
 
 export function loadRegistry(path: string): ReadonlyMap<string, AgentConfig> {
   if (!existsSync(path)) {
@@ -56,10 +73,24 @@ export async function talkToAgent(
 ): Promise<LLMResult> {
   appendMemory(agent.name, "user", userText);
 
+  // B2: if compression is on and history exceeds the threshold, fold the
+  // oldest turns into a summary row. With COMPRESS_MEMORY=false this path is
+  // skipped entirely (paper's prompt-replay wall reproduces).
+  if (config.compressMemory) {
+    const all = loadMemory(agent.name);
+    const nonSummary = all.filter((t) => t.role !== "system");
+    if (nonSummary.length > config.compressThresholdRows + config.compressKeepRows) {
+      await summarizeOld(agent.name, config.compressKeepRows, summarizeTurns);
+    }
+  }
+
   const history = loadMemory(agent.name);
+  const summary = history.find((t) => t.role === "system");
+  const recent = history.filter((t) => t.role !== "system");
   const turns: ChatTurn[] = [
     { role: "system", content: agent.persona ?? `You are ${agent.name}.` },
-    ...history.map((h) => ({ role: h.role, content: h.content }) as ChatTurn),
+    ...(summary ? [{ role: "system" as const, content: summary.content }] : []),
+    ...recent.map((h) => ({ role: h.role as "user" | "assistant", content: h.content }) as ChatTurn),
   ];
 
   const result = await callLLM(turns);

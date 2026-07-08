@@ -125,9 +125,11 @@ operating-system abstraction is conspicuously absent.
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
 implies. They split into three scaling-pathology walls (growth curves) and
 three correctness-cliff walls (invisible until the first adversarial event,
-surfaced via fault-injection rates). We measure all six below. Single runs
-on a developer laptop, one OpenAI-compatible model (glm-5.1), reproducible
-from the artifact (anonymized for review).
+surfaced via fault-injection rates). We measure all six below in the
+uncompressed configuration (the workspace ships a summarization switch that
+bounds prompt-token growth; we disable it to surface the walls). Single
+runs on a developer laptop, one OpenAI-compatible model (glm-5.1),
+reproducible from the artifact (anonymized for review).
 
 \begin{table}[t]
 \caption{Each workaround maps to an OS abstraction that would remove it.}

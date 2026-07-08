@@ -20,6 +20,20 @@ export const historyProbe: Probe = {
       "I prefer dark themes for dashboards.",
       "We ship every Thursday.",
       "Our p99 latency target is 200ms.",
+      "We use Postgres for the catalog.",
+      "The CI runs on GitHub Actions.",
+      "Our deploy target is fly.io.",
+      "We pair on Mondays.",
+      "The API is GraphQL.",
+      "We track p99 not p50.",
+      "Logs go to Loki.",
+      "We pin Node 22.",
+      "The frontend is React.",
+      "We ship dark mode first.",
+      "Our on-call rota is weekly.",
+      "The DB is SQLite.",
+      "We cache with Redis.",
+      "The queue is RabbitMQ.",
     ];
     const points = [];
     for (let i = 0; i < turns.length; i++) {

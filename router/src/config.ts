@@ -28,6 +28,10 @@ export const config = {
   // B2 memory compression: on by default (coforge as usable workspace).
   // Set COMPRESS_MEMORY=false to reproduce the paper's prompt-replay wall.
   compressMemory: process.env.COMPRESS_MEMORY !== "false",
+  // B5 capability routing: on by default. @capability addressing + mismatch
+  // hand-off. Set CAPABILITY_ROUTING=false to reproduce the paper's routing
+  // cliff (regex @name only, no hand-off).
+  capabilityRouting: process.env.CAPABILITY_ROUTING !== "false",
   // summarize when history (rows) exceeds N+K; keep the K most recent turns.
   compressThresholdRows: 20, // N*2 (10 turns)
   compressKeepRows: 8,       // K*2 (4 turns)

@@ -68,11 +68,18 @@ app.post("/api/chat", async (req, reply) => {
     return { user: userMsg, reply: ackMsg, scheduled: { id, fireAt } };
   }
 
+  // B5: if capability routing handed off to a better-matched agent, post a
+  // hand-off note to the channel before the agent answers.
+  if (parsed.handOffNote) {
+    saveMessage(channel, "system", parsed.handOffNote);
+  }
+
   const result = await enqueue(channel, () => talkToAgent(agent, parsed.body));
   const agentMsg = saveMessage(channel, agent.name, result.reply);
   return {
     user: userMsg,
     reply: agentMsg,
+    handOff: parsed.handOffTo ?? null,
     usage: {
       promptTokens: result.usage.promptTokens,
       completionTokens: result.usage.completionTokens,

@@ -124,11 +124,10 @@ operating-system abstraction is conspicuously absent.
 
 Table~\ref{tab:map} lists the six workarounds and the OS abstraction each
 implies. They split into three scaling-pathology walls (growth curves) and
-three correctness-cliff walls (invisible until the first adversarial event,
-surfaced via fault-injection rates). We measure all six below in the
-uncompressed configuration (the workspace ships a summarization switch that
-bounds prompt-token growth; we disable it to surface the walls). Single
-runs on a developer laptop, one OpenAI-compatible model (glm-5.1),
+three correctness-cliff walls (fault-injection rates). We measure all six in
+the uncompressed, no-hand-off configuration (the workspace ships a
+summarization switch and a capability-routing switch; both disabled to
+surface the walls). Single runs, one OpenAI-compatible model (glm-5.1),
 reproducible from the artifact (anonymized for review).
 
 \begin{table}[t]
@@ -244,7 +243,7 @@ one model, small N (8--20--100), no seeds or CIs. They show growth
 not magnitudes. The skills-composition probe is a weak proxy (no scalar
 metric for composition exists); the routing probe uses an LLM judge.
 
-\enlargethispage{\baselineskip}
+\enlargethispage{2\baselineskip}
 
 \section{Conclusion}
 

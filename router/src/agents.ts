@@ -33,18 +33,54 @@ export function loadRegistry(path: string): ReadonlyMap<string, AgentConfig> {
   return map;
 }
 
-// Non-goal: capability routing. parseMention is a regex — it routes by name,
-// not by matching work to the agent best suited for it, and there is no
-// delegation between agents. Deliberately best-effort, not a TODO: it is a
-// measured wall (correctness-cliff at the first capability mismatch). See
-// docs/18 §4 and paper Table 1. The fix is an agent-facing interface/IPC
-// the runtime provides, not a smarter parser here.
+// B5: capability routing. @Noel routes by name (always). With
+// CAPABILITY_ROUTING on, @frontend/@backend/@docs route by capability word
+// to the agent whose role/skills match; and a @name message whose body
+// strongly matches another agent's skills gets handed off (with a note).
+// Off = paper's routing cliff reproduces (regex @name only, no hand-off).
 
 const MENTION_RE = /@([A-Za-z][A-Za-z0-9_-]*)/;
 
 export interface ParsedMention {
   readonly agentName: string;
   readonly body: string;
+  readonly handOffTo?: string; // set when the system reroutes to a better-matched agent
+  readonly handOffNote?: string;
+}
+
+// Find the agent whose skills/role best match a capability word.
+function findAgentByCapability(
+  registry: ReadonlyMap<string, AgentConfig>,
+  cap: string,
+): AgentConfig | undefined {
+  const c = cap.toLowerCase();
+  for (const a of registry.values()) {
+    if (a.role.toLowerCase() === c) return a;
+    if (a.skills.some((s) => s.toLowerCase() === c)) return a;
+  }
+  return undefined;
+}
+
+// Detect a strong capability keyword in the body that belongs to an agent
+// other than `agent`. Returns that agent if a mismatch is found.
+function detectMismatch(
+  agent: AgentConfig,
+  body: string,
+  registry: ReadonlyMap<string, AgentConfig>,
+): AgentConfig | undefined {
+  const lower = body.toLowerCase();
+  for (const other of registry.values()) {
+    if (other.name === agent.name) continue;
+    for (const skill of other.skills) {
+      if (lower.includes(skill.toLowerCase())) {
+        // only a mismatch if the @-mentioned agent does NOT have this skill
+        if (!agent.skills.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+          return other;
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 export function parseMention(
@@ -53,10 +89,36 @@ export function parseMention(
 ): ParsedMention | null {
   const match = MENTION_RE.exec(text);
   if (!match) return null;
-  const name = match[1].toLowerCase();
-  if (!registry.has(name)) return null;
-  const body = text.slice(match.index! + match[0].length).trim();
-  return { agentName: name, body: body || "(no body)" };
+  const token = match[1].toLowerCase();
+  const body = text.slice(match.index! + match[0].length).trim() || "(no body)";
+
+  // B5: @capability addressing — @frontend / @backend / @docs route to the
+  // matching agent regardless of name.
+  if (config.capabilityRouting) {
+    const byCap = findAgentByCapability(registry, token);
+    if (byCap) {
+      return { agentName: byCap.name.toLowerCase(), body };
+    }
+  }
+
+  // Otherwise @name (existing). If no agent by that name, not a mention.
+  const agent = registry.get(token);
+  if (!agent) return null;
+
+  // B5: mismatch hand-off — @Noel but body strongly matches Pat's skills.
+  if (config.capabilityRouting) {
+    const better = detectMismatch(agent, body, registry);
+    if (better) {
+      return {
+        agentName: better.name.toLowerCase(),
+        body,
+        handOffTo: better.name.toLowerCase(),
+        handOffNote: `routed to ${better.name} — this looks like ${better.role} work`,
+      };
+    }
+  }
+
+  return { agentName: token, body };
 }
 
 // Non-goal: inter-agent isolation. All agents share this one process and one

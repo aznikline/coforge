@@ -3,6 +3,7 @@ export interface AgentConfig {
   readonly color: string;
   readonly role: string;
   readonly persona: string;
+  readonly skills: readonly string[];
 }
 
 export interface ChatMessage {

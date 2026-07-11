@@ -22,6 +22,9 @@ export const config = {
   routerPort: Number(process.env.ROUTER_PORT ?? 8787),
   agentsFile: process.env.AGENTS_FILE ?? join(PROJECT_ROOT, "agents.json"),
   dbPath: process.env.DB_PATH ?? join(PROJECT_ROOT, "coforge.db"),
+  // M1: the human has a name (not the literal "you"). Single user for now;
+  // B4 adds accounts. Set USER_NAME in .env.
+  userName: process.env.USER_NAME ?? "wizout",
   // B2 memory compression: on by default (coforge as usable workspace).
   // Set COMPRESS_MEMORY=false to reproduce the paper's prompt-replay wall.
   compressMemory: process.env.COMPRESS_MEMORY !== "false",

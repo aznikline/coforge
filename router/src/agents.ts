@@ -97,3 +97,19 @@ export async function talkToAgent(
   appendMemory(agent.name, "assistant", result.reply);
   return result;
 }
+
+// M2: an agent-initiated message — the agent posts to a channel on its own
+// schedule (a fired reminder), not in response to an @mention. This is the
+// "agent presence" that makes a channel a collaboration surface, not a
+// help-desk queue. Single-agent timer path; does not touch multi-agent
+// coordination (the OS-taboo line).
+export async function agentInitiate(agent: AgentConfig, reminderBody: string): Promise<string> {
+  const turns: ChatTurn[] = [
+    { role: "system", content: agent.persona ?? `You are ${agent.name}.` },
+    { role: "system", content: "A reminder you set is now due. Post a short, in-character message to the channel about it. Do not prefix with your name." },
+    { role: "user", content: `Reminder due: ${reminderBody}` },
+  ];
+  const result = await callLLM(turns);
+  appendMemory(agent.name, "assistant", result.reply);
+  return result.reply;
+}

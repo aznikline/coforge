@@ -1,9 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import type { ChatMessage } from "./types.js";
+import { config } from "./config.js";
 
-const DB_PATH = process.env.DB_PATH ?? "coforge.db";
-
-const db = new DatabaseSync(DB_PATH);
+// Use config.dbPath (PROJECT_ROOT absolute) so store, memory, and reminders
+// share ONE db file — not three. Was a path bug: store used cwd-relative
+// "coforge.db" while others used config.dbPath, splitting state across files.
+const db = new DatabaseSync(config.dbPath);
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { fetchMessages, sendChat, type ChatMessage } from "./api";
+import { KanbanView } from "./KanbanView";
 
 const CHANNEL = "general";
 const AGENT_COLORS: Record<string, string> = {
@@ -14,6 +15,7 @@ export function App(): JSX.Element {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"chat" | "kanban">("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -56,7 +58,41 @@ export function App(): JSX.Element {
         <span className="subtitle">
           single channel · try @Noel @Pat @Sam
         </span>
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setView("chat")}
+            style={{
+              padding: "4px 14px",
+              background: view === "chat" ? "#333" : "transparent",
+              color: view === "chat" ? "#fff" : "#888",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "0.8rem",
+            }}
+          >
+            💬 Chat
+          </button>
+          <button
+            onClick={() => setView("kanban")}
+            style={{
+              padding: "4px 14px",
+              background: view === "kanban" ? "#333" : "transparent",
+              color: view === "kanban" ? "#fff" : "#888",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "0.8rem",
+            }}
+          >
+            📋 Kanban
+          </button>
+        </div>
       </header>
+      {view === "kanban" ? (
+        <KanbanView onClose={() => setView("chat")} />
+      ) : (
+        <>
       <div className="messages" ref={scrollRef}>
         {messages.length === 0 && (
           <div className="empty">say hi to an agent — @Noel I&apos;m wizout</div>
@@ -83,6 +119,8 @@ export function App(): JSX.Element {
         </button>
       </form>
       {error && <div className="error">{error}</div>}
+        </>
+      )}
     </div>
   );
 }

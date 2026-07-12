@@ -1,10 +1,13 @@
 import Fastify from "fastify";
+import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.js";
 import { loadRegistry, parseMention, talkToAgent, agentInitiate } from "./agents.js";
 import { enqueue } from "./queue.js";
 import { saveMessage, listMessages, clearMessages } from "./store.js";
 import { clearMemory } from "./memory.js";
 import { scheduleReminder, dueReminders, markFired, parseReminder, parseWhen } from "./reminders.js";
+import type { WorkItem } from "./types.js";
+import { ensureWorkGraphTables, createWorkItem, getWorkGraph, parseWorkItems } from "./workgraph.js";
 
 function clearAll(): void {
   clearMessages();
@@ -27,6 +30,27 @@ app.get("/api/messages/:channel", async (req) => {
 // Test-infrastructure endpoint: clears all agent memory and channel history.
 // Used by the harness to get a clean baseline before probing. Not a user
 // feature — do not expose in the UI.
+// Phase 3: Work Graph API
+const wgDb = new DatabaseSync(config.dbPath);
+ensureWorkGraphTables(wgDb);
+
+app.get("/api/workgraph", async () => {
+  return getWorkGraph(wgDb);
+});
+
+app.post("/api/workgraph/items", async (req) => {
+  const { title, type, status, assignee } = (req.body || {}) as Record<string, string>;
+  if (!title) return { error: "title required" };
+  const item = createWorkItem(wgDb, {
+    type: (type as WorkItem["type"]) || "task",
+    title,
+    status: status || "todo",
+    assignee,
+    tags: [],
+  });
+  return { item };
+});
+
 app.post("/api/reset", async () => {
   clearAll();
   return { ok: true };
@@ -39,6 +63,18 @@ app.post("/api/chat", async (req, reply) => {
   }
 
   const userMsg = saveMessage(channel, config.userName, text);
+  // Auto-extract WorkItems from chat messages (Phase 3)
+  const extracted = parseWorkItems(text, config.userName);
+  for (const item of extracted) {
+    createWorkItem(wgDb, {
+      type: item.type,
+      title: item.title,
+      status: item.status || "todo",
+      assignee: item.assignee,
+      tags: [],
+      source_msg_id: userMsg.id,
+    });
+  }
   const parsed = parseMention(text, registry);
 
   if (!parsed) {

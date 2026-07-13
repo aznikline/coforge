@@ -132,8 +132,10 @@ export function parseMention(
 export async function talkToAgent(
   agent: AgentConfig,
   userText: string,
+  channel?: string,
 ): Promise<LLMResult> {
-  appendMemory(agent.name, "user", userText);
+  const tagged = channel ? `[#${channel}] ${userText}` : userText;
+  appendMemory(agent.name, "user", tagged);
 
   // B2: if compression is on and history exceeds the threshold, fold the
   // oldest turns into a summary row. With COMPRESS_MEMORY=false this path is

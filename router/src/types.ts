@@ -40,6 +40,10 @@ export interface WorkItem {
   readonly tags: readonly string[];
   readonly created_at: string;
   readonly updated_at: string;
+  readonly claimed_by?: string;
+  readonly claimed_at?: string;
+  readonly completed_at?: string;
+  readonly reviewer?: string;
 }
 
 export interface WorkEdge {

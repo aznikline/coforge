@@ -8,6 +8,8 @@ import { clearMemory } from "./memory.js";
 import { scheduleReminder, dueReminders, markFired, parseReminder, parseWhen } from "./reminders.js";
 import type { WorkItem } from "./types.js";
 import { ensureWorkGraphTables, createWorkItem, getWorkGraph, parseWorkItems } from "./workgraph.js";
+import { ensureTaskTables, claimTask, transitionTask, listTasks, getTaskEvents } from "./tasks.js";
+import { loadMemory, appendMemory, clearMemory } from "./memory.js";
 
 function clearAll(): void {
   clearMessages();
@@ -33,6 +35,15 @@ app.get("/api/messages/:channel", async (req) => {
 // Phase 3: Work Graph API
 const wgDb = new DatabaseSync(config.dbPath);
 ensureWorkGraphTables(wgDb);
+// Phase 5: ensure channels table
+wgDb.exec(`
+  CREATE TABLE IF NOT EXISTS channels (
+    name TEXT PRIMARY KEY,
+    agents TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  INSERT OR IGNORE INTO channels (name, agents) VALUES ('general', '["Noel","Pat","Sam"]');
+`);
 
 app.get("/api/workgraph", async () => {
   return getWorkGraph(wgDb);
@@ -49,6 +60,90 @@ app.post("/api/workgraph/items", async (req) => {
     tags: [],
   });
   return { item };
+});
+
+// Phase 4: Task system
+ensureTaskTables(wgDb);
+
+app.get("/api/tasks", async (req) => {
+  const { status, assignee } = (req.query || {}) as Record<string, string>;
+  return { tasks: listTasks(wgDb, { status, assignee }) };
+});
+
+app.get("/api/tasks/:id", async (req) => {
+  const { id } = req.params as { id: string };
+  const task = (await import("./tasks.js")).getTask(wgDb, id);
+  if (!task) return { error: "not found" };
+  return { task, events: getTaskEvents(wgDb, id) };
+});
+
+app.post("/api/tasks/:id/claim", async (req) => {
+  const { id } = req.params as { id: string };
+  const { agent } = (req.body || {}) as { agent?: string };
+  if (!agent) return { error: "agent required" };
+  try {
+    return claimTask(wgDb, id, agent);
+  } catch (e) { return { error: String(e) }; }
+});
+
+app.post("/api/tasks/:id/transition", async (req) => {
+  const { id } = req.params as { id: string };
+  const { action, actor, reason } = (req.body || {}) as { action?: string; actor?: string; reason?: string };
+  if (!action || !actor) return { error: "action and actor required" };
+  try {
+    return transitionTask(wgDb, id, action, actor, reason);
+  } catch (e) { return { error: String(e) }; }
+});
+
+// Phase 5: Channel isolation
+app.get("/api/channels", async () => {
+  const rows = wgDb.prepare("SELECT * FROM channels ORDER BY name").all() as Record<string, unknown>[];
+  return rows.map(r => ({
+    name: r.name,
+    agents: JSON.parse(r.agents as string || "[]"),
+    created_at: r.created_at,
+    message_count: (wgDb.prepare("SELECT COUNT(*) as c FROM messages WHERE channel=?").get(r.name) as {c:number}).c,
+  }));
+});
+
+app.post("/api/channels", async (req) => {
+  const { name, agents } = (req.body || {}) as { name?: string; agents?: string[] };
+  if (!name) return { error: "name required" };
+  try {
+    wgDb.prepare("INSERT INTO channels (name, agents) VALUES (?, ?)").run(name, JSON.stringify(agents || ["Noel","Pat","Sam"]));
+    return { channel: { name, agents: agents || ["Noel","Pat","Sam"], created_at: new Date().toISOString() } };
+  } catch (e) { return { error: String(e) }; }
+});
+
+// Phase 6: Memory inspection
+app.get("/api/memory/:agent/search", async (req) => {
+  const { agent } = req.params as { agent: string };
+  const { q } = (req.query || {}) as { q?: string };
+  if (!q) return { results: [] };
+  const all = loadMemory(agent);
+  const lower = q.toLowerCase();
+  return { results: all.filter(t => t.content.toLowerCase().includes(lower)).slice(0, 20) };
+});
+
+app.get("/api/memory/:agent/messages", async (req) => {
+  const { agent } = req.params as { agent: string };
+  const all = loadMemory(agent);
+  const compressed = all.filter(t => t.role === "system").length;
+  return { messages: all, total: all.length, compressed_count: compressed };
+});
+
+app.delete("/api/memory/:agent/messages/:ts", async (req) => {
+  const { agent, ts } = req.params as { agent: string; ts: string };
+  wgDb.prepare("DELETE FROM agent_memory WHERE agent=? AND ts=?").run(agent, parseInt(ts));
+  return { ok: true };
+});
+
+app.post("/api/memory/:agent/inject", async (req) => {
+  const { agent } = req.params as { agent: string };
+  const { content } = (req.body || {}) as { content?: string };
+  if (!content) return { error: "content required" };
+  appendMemory(agent, "system", content);
+  return { ok: true };
 });
 
 app.post("/api/reset", async () => {
@@ -110,7 +205,7 @@ app.post("/api/chat", async (req, reply) => {
     saveMessage(channel, "system", parsed.handOffNote);
   }
 
-  const result = await enqueue(channel, () => talkToAgent(agent, parsed.body));
+  const result = await enqueue(channel, () => talkToAgent(agent, parsed.body, channel));
   const agentMsg = saveMessage(channel, agent.name, result.reply);
   return {
     user: userMsg,

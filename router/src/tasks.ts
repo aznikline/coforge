@@ -21,10 +21,10 @@ export function ensureTaskTables(db: DatabaseSync): void {
 // === State Machine ===
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  todo: ["claimed"],
-  claimed: ["in_progress", "todo"],  // can unclaim back to todo
-  in_progress: ["in_review", "blocked"],
-  in_review: ["done", "in_progress"],  // reject → back to in_progress
+  todo: ["claimed", "in_progress"],  // can skip claim and go straight to in_progress
+  claimed: ["in_progress", "todo"],
+  in_progress: ["in_review", "blocked", "todo"],
+  in_review: ["done", "in_progress"],
   done: [],
   blocked: ["in_progress", "todo"],
 };

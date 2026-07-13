@@ -15,9 +15,19 @@ export function ensureWorkGraphTables(db: DatabaseSync): void {
       parent_id TEXT,
       source_msg_id INTEGER,
       tags TEXT NOT NULL DEFAULT '[]',
+      claimed_by TEXT,
+      claimed_at TEXT,
+      completed_at TEXT,
+      reviewer TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+  `);
+  // Migration: add task columns if upgrading from old schema (ignore errors if they already exist)
+  for (const col of ["claimed_by", "claimed_at", "completed_at", "reviewer"]) {
+    try { db.exec(`ALTER TABLE work_items ADD COLUMN ${col} TEXT`); } catch { /* already exists */ }
+  }
+  db.exec(`
     CREATE TABLE IF NOT EXISTS work_edges (
       id TEXT PRIMARY KEY,
       from_id TEXT NOT NULL,

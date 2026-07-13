@@ -4,12 +4,11 @@ import { config } from "./config.js";
 import { loadRegistry, parseMention, talkToAgent, agentInitiate } from "./agents.js";
 import { enqueue } from "./queue.js";
 import { saveMessage, listMessages, clearMessages } from "./store.js";
-import { clearMemory } from "./memory.js";
+import { clearMemory, loadMemory, appendMemory } from "./memory.js";
 import { scheduleReminder, dueReminders, markFired, parseReminder, parseWhen } from "./reminders.js";
 import type { WorkItem } from "./types.js";
 import { ensureWorkGraphTables, createWorkItem, getWorkGraph, parseWorkItems } from "./workgraph.js";
 import { ensureTaskTables, claimTask, transitionTask, listTasks, getTaskEvents } from "./tasks.js";
-import { loadMemory, appendMemory, clearMemory } from "./memory.js";
 
 function clearAll(): void {
   clearMessages();
@@ -97,12 +96,12 @@ app.post("/api/tasks/:id/transition", async (req) => {
 
 // Phase 5: Channel isolation
 app.get("/api/channels", async () => {
-  const rows = wgDb.prepare("SELECT * FROM channels ORDER BY name").all() as Record<string, unknown>[];
+  const rows = wgDb.prepare("SELECT * FROM channels ORDER BY name").all() as { name: string; agents: string; created_at: string }[];
   return rows.map(r => ({
     name: r.name,
-    agents: JSON.parse(r.agents as string || "[]"),
+    agents: JSON.parse(r.agents || "[]"),
     created_at: r.created_at,
-    message_count: (wgDb.prepare("SELECT COUNT(*) as c FROM messages WHERE channel=?").get(r.name) as {c:number}).c,
+    message_count: (wgDb.prepare("SELECT COUNT(*) as c FROM messages WHERE channel=?").get(r.name) as { c: number }).c,
   }));
 });
 

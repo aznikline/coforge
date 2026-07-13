@@ -37,6 +37,20 @@ export function ensureWorkGraphTables(db: DatabaseSync): void {
       FOREIGN KEY(to_id) REFERENCES work_items(id)
     );
   `);
+  // Idempotent migration: older coforge.db files were created by the prior
+  // schema (no claimed_by/completed_at/reviewer). CREATE IF NOT EXISTS is a
+  // no-op on an existing table, so backfill the columns tasks.ts needs. The
+  // guard around each ALTER mirrors SQLite's "column already exists" failure
+  // on re-run — wrapped so a present column is a silent no-op, not a crash.
+  const cols = ["claimed_by", "claimed_at", "completed_at", "reviewer"] as const;
+  for (const col of cols) {
+    const existing = db.prepare(
+      "SELECT name FROM pragma_table_info('work_items') WHERE name = ?",
+    ).get(col);
+    if (!existing) {
+      db.exec(`ALTER TABLE work_items ADD COLUMN ${col} TEXT`);
+    }
+  }
 }
 
 const insertItemStmt = (db: DatabaseSync) => db.prepare(

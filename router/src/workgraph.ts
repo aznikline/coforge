@@ -165,6 +165,11 @@ export function listWorkItems(db: DatabaseSync): WorkItem[] {
       tags: JSON.parse(r.tags as string || "[]"),
       created_at: r.created_at as string,
       updated_at: r.updated_at as string,
+      claimed_by: (r.claimed_by as string) || undefined,
+      claimed_at: (r.claimed_at as string) || undefined,
+      completed_at: (r.completed_at as string) || undefined,
+      reviewer: (r.reviewer as string) || undefined,
+      stage_id: (r.stage_id as string) || undefined,
     };
   });
 }
@@ -192,4 +197,83 @@ export function getWorkGraph(db: DatabaseSync): WorkGraph {
     items: listWorkItems(db),
     edges: listWorkEdges(db),
   };
+}
+
+// === Stage Graph Tables (Phase 7a: Stage Foundation) ===
+
+export function ensureStageTables(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stage_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS stages (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      "order" INTEGER NOT NULL DEFAULT 0,
+      gate_condition TEXT NOT NULL DEFAULT '{}',
+      reviewer_policy TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'pending',
+      FOREIGN KEY(template_id) REFERENCES stage_templates(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS stage_transitions (
+      id TEXT PRIMARY KEY,
+      from_stage_id TEXT NOT NULL,
+      to_stage_id TEXT NOT NULL,
+      gate_condition TEXT NOT NULL DEFAULT '{}',
+      reviewer_policy TEXT NOT NULL DEFAULT '{}',
+      transition_action TEXT NOT NULL DEFAULT 'advance',
+      FOREIGN KEY(from_stage_id) REFERENCES stages(id),
+      FOREIGN KEY(to_stage_id) REFERENCES stages(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS pipeline_runs (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL,
+      current_stage_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(template_id) REFERENCES stage_templates(id),
+      FOREIGN KEY(current_stage_id) REFERENCES stages(id)
+    );
+  `);
+
+  // Migration: add stage_id to work_items (nullable, backward-compatible)
+  try {
+    db.exec(`ALTER TABLE work_items ADD COLUMN stage_id TEXT`);
+  } catch { /* column already exists */ }
+}
+
+// === Evidence Chain Tables (Phase 7b: Cryptographic Audit) ===
+
+export function ensureEvidenceTables(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS evidence_events (
+      id TEXT PRIMARY KEY,
+      run_id TEXT,
+      task_id TEXT,
+      stage_id TEXT,
+      transition_id TEXT,
+      event_type TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      payload_hash TEXT NOT NULL,
+      prev_hash TEXT NOT NULL DEFAULT '',
+      signature TEXT,
+      ts INTEGER NOT NULL,
+      FOREIGN KEY(run_id) REFERENCES pipeline_runs(id),
+      FOREIGN KEY(task_id) REFERENCES work_items(id),
+      FOREIGN KEY(stage_id) REFERENCES stages(id),
+      FOREIGN KEY(transition_id) REFERENCES stage_transitions(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_evidence_run ON evidence_events(run_id);
+    CREATE INDEX IF NOT EXISTS idx_evidence_prev ON evidence_events(prev_hash);
+  `);
 }

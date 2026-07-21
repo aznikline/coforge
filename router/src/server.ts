@@ -7,8 +7,10 @@ import { saveMessage, listMessages, clearMessages } from "./store.js";
 import { clearMemory, loadMemory, appendMemory } from "./memory.js";
 import { scheduleReminder, dueReminders, markFired, parseReminder, parseWhen } from "./reminders.js";
 import type { WorkItem } from "./types.js";
-import { ensureWorkGraphTables, createWorkItem, getWorkGraph, parseWorkItems } from "./workgraph.js";
+import { ensureWorkGraphTables, createWorkItem, getWorkGraph, parseWorkItems, ensureStageTables, ensureEvidenceTables } from "./workgraph.js";
 import { ensureTaskTables, claimTask, transitionTask, listTasks, getTaskEvents } from "./tasks.js";
+import { createTemplateWithStages, listTemplates, getTemplate, listStages, createRun, listRuns, getRun, seedTemplates, evaluateGate, executeTransition, getTransitionsFromStage } from "./stages.js";
+import { recordEvidence, signEvidence, listEvidence, verifyChain, recordTransitionEvidence } from "./evidence.js";
 
 function clearAll(): void {
   clearMessages();
@@ -64,6 +66,13 @@ app.post("/api/workgraph/items", async (req) => {
 // Phase 4: Task system
 ensureTaskTables(wgDb);
 
+// Phase 7a: Stage system
+ensureStageTables(wgDb);
+seedTemplates(wgDb);
+
+// Phase 7b: Evidence Chain
+ensureEvidenceTables(wgDb);
+
 app.get("/api/tasks", async (req) => {
   const { status, assignee } = (req.query || {}) as Record<string, string>;
   return { tasks: listTasks(wgDb, { status, assignee }) };
@@ -91,6 +100,150 @@ app.post("/api/tasks/:id/transition", async (req) => {
   if (!action || !actor) return { error: "action and actor required" };
   try {
     return transitionTask(wgDb, id, action, actor, reason);
+  } catch (e) { return { error: String(e) }; }
+});
+
+// Phase 7a: Stage Graph API
+app.get("/api/templates", async () => {
+  return { templates: listTemplates(wgDb) };
+});
+
+app.get("/api/templates/:id", async (req) => {
+  const { id } = req.params as { id: string };
+  const template = getTemplate(wgDb, id);
+  if (!template) return { error: "not found" };
+  const stages = listStages(wgDb, id);
+  return { template, stages };
+});
+
+app.post("/api/templates", async (req) => {
+  const { name, description, stages, transitions } = (req.body || {}) as {
+    name?: string;
+    description?: string;
+    stages?: { name: string; order: number; gate_condition?: string; reviewer_policy?: string }[];
+    transitions?: { from_stage_order: number; to_stage_order: number; gate_condition?: string; reviewer_policy?: string; transition_action?: string }[];
+  };
+  if (!name) return { error: "name required" };
+  if (!stages || stages.length === 0) return { error: "stages required" };
+  try {
+    const result = createTemplateWithStages(wgDb, {
+      name,
+      description: description || "",
+      stages,
+      transitions: transitions?.map(t => ({
+        from_stage_order: t.from_stage_order,
+        to_stage_order: t.to_stage_order,
+        gate_condition: t.gate_condition,
+        reviewer_policy: t.reviewer_policy,
+        transition_action: t.transition_action as "advance" | "reject" | "branch" | undefined,
+      })),
+    });
+    return result;
+  } catch (e) { return { error: String(e) }; }
+});
+
+app.get("/api/stages/:template_id", async (req) => {
+  const { template_id } = req.params as { template_id: string };
+  return { stages: listStages(wgDb, template_id) };
+});
+
+// Phase 7a: Pipeline Run API
+app.get("/api/runs", async () => {
+  return { runs: listRuns(wgDb) };
+});
+
+app.get("/api/runs/:id", async (req) => {
+  const { id } = req.params as { id: string };
+  const run = getRun(wgDb, id);
+  if (!run) return { error: "not found" };
+  return { run };
+});
+
+app.post("/api/runs", async (req) => {
+  const { template_id } = (req.body || {}) as { template_id?: string };
+  if (!template_id) return { error: "template_id required" };
+  const template = getTemplate(wgDb, template_id);
+  if (!template) return { error: "template not found" };
+  const stages = listStages(wgDb, template_id);
+  if (stages.length === 0) return { error: "template has no stages" };
+  const firstStage = stages[0]; // sorted by order ASC
+  try {
+    const run = createRun(wgDb, template_id, firstStage.id);
+    return { run, current_stage: firstStage };
+  } catch (e) { return { error: String(e) }; }
+});
+
+// Phase 7b: Evidence Chain API
+app.get("/api/runs/:run_id/evidence", async (req) => {
+  const { run_id } = req.params as { run_id: string };
+  return { events: listEvidence(wgDb, run_id) };
+});
+
+app.get("/api/runs/:run_id/evidence/verify", async (req) => {
+  const { run_id } = req.params as { run_id: string };
+  return verifyChain(wgDb, run_id);
+});
+
+app.post("/api/runs/:run_id/evidence", async (req) => {
+  const { run_id } = req.params as { run_id: string };
+  const { event_type, actor, payload, stage_id, transition_id, task_id } = (req.body || {}) as {
+    event_type?: string;
+    actor?: string;
+    payload?: Record<string, unknown>;
+    stage_id?: string;
+    transition_id?: string;
+    task_id?: string;
+  };
+  if (!event_type || !actor || !payload) return { error: "event_type, actor, and payload required" };
+  try {
+    const event = recordEvidence(wgDb, {
+      run_id,
+      stage_id,
+      transition_id,
+      task_id,
+      event_type: event_type as "gate_check" | "reviewer_signoff" | "artifact_hash" | "transition_executed",
+      actor,
+      payload,
+    });
+    return { event };
+  } catch (e) { return { error: String(e) }; }
+});
+
+app.post("/api/evidence/:id/sign", async (req) => {
+  const { id } = req.params as { id: string };
+  const { actor } = (req.body || {}) as { actor?: string };
+  if (!actor) return { error: "actor required" };
+  const signed = signEvidence(wgDb, id, actor);
+  if (!signed) return { error: "evidence not found" };
+  return { event: signed };
+});
+
+// Phase 7c: Stage State Machine API
+app.get("/api/runs/:id/transitions", async (req) => {
+  const { id } = req.params as { id: string };
+  const run = getRun(wgDb, id);
+  if (!run) return { error: "run not found" };
+  const transitions = getTransitionsFromStage(wgDb, run.current_stage_id);
+  return { transitions };
+});
+
+app.get("/api/runs/:id/gate", async (req) => {
+  const { id } = req.params as { id: string };
+  const run = getRun(wgDb, id);
+  if (!run) return { error: "run not found" };
+  const stage = (await import("./stages.js")).getStage(wgDb, run.current_stage_id);
+  if (!stage) return { error: "stage not found" };
+  const result = evaluateGate(wgDb, stage);
+  return { stage: stage.name, ...result };
+});
+
+app.post("/api/runs/:id/transition", async (req) => {
+  const { id } = req.params as { id: string };
+  const { transition_id, reviewer } = (req.body || {}) as { transition_id?: string; reviewer?: string };
+  if (!transition_id || !reviewer) return { error: "transition_id and reviewer required" };
+  try {
+    const result = await executeTransition(wgDb, id, transition_id, reviewer);
+    return result;
   } catch (e) { return { error: String(e) }; }
 });
 

@@ -138,5 +138,6 @@ function rowToItem(row: Record<string, unknown>): WorkItem {
     claimed_at: (row.claimed_at as string) || undefined,
     completed_at: (row.completed_at as string) || undefined,
     reviewer: (row.reviewer as string) || undefined,
+    stage_id: (row.stage_id as string) || undefined,
   };
 }
